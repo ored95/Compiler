@@ -4,6 +4,7 @@ using C5;
 
 using State = System.Int32;
 using Input = System.Char;
+
 namespace Engine
 {
     class NFA
@@ -153,9 +154,9 @@ namespace Engine
             return newTransTable;
         }
 
-        public List<State> Move(List<State> states, Input @input)
+        public Set<State> Move(Set<State> states, Input @input)
         {
-            List<State> result = new List<State>();
+            Set<State> result = new Set<State>();
 
             foreach (State s in states)
             {
@@ -167,7 +168,9 @@ namespace Engine
                     if (ip == @input)
                     {
                         State u = Array.IndexOf(transTable[s], ip, i);
-                        result.Add(u);
+
+                        if (u >= 0)             // Fixed bug: IndexOutOfRangeException
+                            result.Add(u);
                     }
 
                     i += 1;

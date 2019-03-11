@@ -6,37 +6,17 @@ namespace Engine
     {
         static void Main(string[] args)
         {
-            string src = "a+";//"(ab|c)+aab|b";
+            //string src = "a+";
+            //string src = "(ab|c)+aab|b";
+            string src = "(a|b)*aab";
+            bool flag  = true;
 
-            var rp = new RegexParser(src);
+            var dfa = Machine.Execute(src, flag);
+            
+            Console.Write("\n\nInput regex: ");
+            string test = Console.ReadLine();
 
-            Console.WriteLine(rp.GetData());
-
-            ParseTree parseTree = rp.RegexToTree();
-
-            // Checking for a string termination character after parsing the regex
-            if (rp.FailAfterRegexParser())
-            {
-                Console.WriteLine("Parse error: Fail to parse the current regex");
-                Environment.Exit(1);
-            }
-
-            // Show tree after parsing
-            rp.PrintTree(parseTree, 1);
-            Console.ReadLine();
-
-            // Convert parse tree into NFA
-            NFA nfa = NFA.TreeToNFA(parseTree);
-
-            nfa.Show();
-
-            //DFA dfa = SubsetMachine.SubsetConstruct(nfa);
-
-            //dfa.Show();
-
-            //Console.Write("\n\n");
-
-            //Console.Write("Result: {0}", dfa.Simulate(args[2]));
+            Console.WriteLine("Result: {0}", dfa.Simulate(test));
 
             Console.ReadKey();
         }
