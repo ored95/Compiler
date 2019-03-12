@@ -6,19 +6,28 @@ namespace Engine
     {
         static void Main(string[] args)
         {
-            //string src = "a+";
-            //string src = "(ab|c)+aab|b";
-            string src = "(a|b)*aab";
+            //string src = "a*";
+            //string src = "b+"
+            string src = "(ab|c)+aab|b";
+            //string src = "(a|b)*aab";
             bool flag  = true;
 
             var dfa = Machine.Execute(src, flag);
-            
-            Console.Write("\n\nInput regex: ");
-            string test = Console.ReadLine();
 
-            Console.WriteLine("Result: {0}", dfa.Simulate(test));
+            var fsm = Minimization.TableEquivalence(dfa);
 
-            Console.ReadKey();
+            fsm.Show();
+
+            while (true)
+            {
+                Console.Write("\n\nRegex: {0}\nInput test: ", src);
+                string test = Console.ReadLine();
+
+                if (test.Length != 0)
+                    Console.WriteLine("Result: {0}", dfa.Simulate(test));
+                else
+                    Environment.Exit(1);
+            }
         }
     }
 }

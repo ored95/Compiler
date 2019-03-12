@@ -78,6 +78,18 @@ namespace Engine
                 return s2.ContainsAll(s1);
         }
 
+        public static Set<T> MakeCopy(Set<T> old)
+        {
+            Set<T> @new = new Set<T>();
+
+            foreach (T item in old)
+            {
+                @new.Add(item);
+            }
+
+            return @new;
+        }
+
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
@@ -89,7 +101,7 @@ namespace Engine
             foreach (T x in this)
             {
                 if (!first)
-                    sb.Append(",");
+                    sb.Append(", ");
                 sb.Append(x);
                 first = false;
             }

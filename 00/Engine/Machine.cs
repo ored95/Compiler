@@ -75,7 +75,7 @@ namespace Engine
             {
                 nfa.initial
             };
-            
+
             // Initially, EpsilonClosure(nfa.initial) is the only state in the DFAs states and it's unmarked.
             Set<state> first = EpsilonClosure(nfa, nfaInitial);
             unmarkedStates.Add(first);
@@ -103,7 +103,9 @@ namespace Engine
                     dfa.final.Add(dfaStateNum[aState]);
                 }
 
-                IEnumerator<input> iE = nfa.inputs.GetEnumerator();
+                // Set our alphabets
+                dfa.alphabet = nfa.inputs;
+                IEnumerator<input> iE = dfa.alphabet.GetEnumerator();
 
                 // For each input symbol the nfa knows ...
                 while (iE.MoveNext())
@@ -125,6 +127,18 @@ namespace Engine
                     };
 
                     dfa.transTable[transition] = dfaStateNum[next];
+                }
+
+                // Collect all states
+                dfa.states = new Set<state>
+                {
+                    dfa.start
+                };
+
+                foreach (var tf in  dfa.transTable)
+                {
+                    if (!dfa.states.Contains(tf.Value))
+                        dfa.states.Add(tf.Value);
                 }
             }
 

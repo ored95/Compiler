@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 using State = System.Int32;
 using Input = System.Char;
+using C5;
 
 namespace Engine
 {
@@ -11,12 +12,14 @@ namespace Engine
         public State start;
         public Set<State> final;
         public SortedList<C5.KeyValuePair<State, Input>, State> transTable;
+        public C5.SortedArray<Input> alphabet;
+        public Set<State> states;
 
         public DFA()
         {
             final = new Set<State>();
 
-            transTable = new SortedList<C5.KeyValuePair<State, Input>, State>(new Comparer());
+            transTable = new SortedList<C5.KeyValuePair<State, Input>, State>(new Comparer<int>());
         }
 
         public string Simulate(string @in)
@@ -40,7 +43,8 @@ namespace Engine
 
         public void Show()
         {
-            Console.Write("DFA start state: {0}\n", start);
+            Console.WriteLine("\n\n********** TOTAL: {0} state(s) **********", states.Count);
+            Console.WriteLine("DFA start state: {0}", start);
             Console.Write("DFA final state(s): ");
 
             IEnumerator<State> iE = final.GetEnumerator();
@@ -55,14 +59,14 @@ namespace Engine
         }
     }
 
-    public class Comparer : IComparer<C5.KeyValuePair<State, Input>>
+    public class Comparer<T> : IComparer<C5.KeyValuePair<T, Input>>
     {
-        public int Compare(C5.KeyValuePair<int, char> T1, C5.KeyValuePair<int, char> transition2)
+        int IComparer<C5.KeyValuePair<T, char>>.Compare(C5.KeyValuePair<T, char> x, C5.KeyValuePair<T, char> y)
         {
-            if (T1.Key == transition2.Key)
-                return T1.Value.CompareTo(transition2.Value);
+            if (x.Value == y.Value)
+                return x.Key.GetHashCode().CompareTo(y.Key.GetHashCode());
             else
-                return T1.Key.CompareTo(transition2.Key);
+                return x.Value.CompareTo(y.Value);
         }
     }
 }

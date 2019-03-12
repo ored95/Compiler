@@ -185,9 +185,9 @@ namespace Engine
         /// </summary>
         public void Show()
         {
-            Console.WriteLine("This NFA has {0} states: 0 - {1}", size, size - 1);
-            Console.WriteLine("The initial state is {0}", initial);
-            Console.WriteLine("The final state is {0}\n", final);
+            Console.WriteLine("\n\n********** TOTAL: {0} state(s) **********", size);
+            Console.WriteLine("NFA start state is {0}", initial);
+            Console.WriteLine("NFA final state is {0}\n", final);
 
             for (State from = 0; from < size; ++from)
             {
@@ -206,8 +206,6 @@ namespace Engine
                     }
                 }
             }
-
-            Console.WriteLine("\n");
         }
 
         /// <summary>
