@@ -2,9 +2,11 @@
 Introduction to compiler
 
 ## Regex - NFA - DFA
-@ Regex-to-NFA [Link](https://en.wikipedia.org/wiki/Thompson%27s_construction) - transforming a regular expression into an equivalent nondeterministic finite automaton.
-@ NFA-to-DFA ([Link 1](http://web.cecs.pdx.edu/~harry/compilers/slides/LexicalPart3.pdf)|[Link 2](https://er.yuvayana.org/nfa-to-dfa-conversion-algorithm-with-solved-example/)) - converting a nondeterministic finite automaton into a equivalent deterministic finite automaton.
-@ DFA minimization ([Link](https://en.wikipedia.org/wiki/DFA_minimization)) - transforming a given deterministic finite automaton (DFA) into an equivalent DFA that has a minimum number of states.
+(A) Regex-to-NFA [Link](https://en.wikipedia.org/wiki/Thompson%27s_construction) - transforming a regular expression into an equivalent nondeterministic finite automaton.
+
+(B) NFA-to-DFA ([Link 1](http://web.cecs.pdx.edu/~harry/compilers/slides/LexicalPart3.pdf)|[Link 2](https://er.yuvayana.org/nfa-to-dfa-conversion-algorithm-with-solved-example/)) - converting a nondeterministic finite automaton into a equivalent deterministic finite automaton.
+
+(C) DFA minimization ([Link](https://en.wikipedia.org/wiki/DFA_minimization)) - transforming a given deterministic finite automaton (DFA) into an equivalent DFA that has a minimum number of states.
 
 **References**
 The following links can help you when dealing with regexes:
