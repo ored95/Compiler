@@ -19,8 +19,9 @@ namespace Engine
         /// </summary>
         /// <param name="in"></param>
         /// <param name="flagShow"></param>
+        /// <param name="graphShow"></param>
         /// <returns></returns>
-        public static DFA Execute(string @in, bool flagShow)
+        public static DFA Execute(string @in, bool flagShow, bool graphShow)
         {
             // Preprocess for string
             var rp = new RegexParser(@in);
@@ -49,6 +50,12 @@ namespace Engine
                 nfa.Show();
 
                 dfa.Show();
+            }
+
+            if (graphShow)
+            {
+                Graphviz.SaveNFA(nfa);
+                Graphviz.SaveDFA(dfa);
             }
 
             return dfa;

@@ -9,11 +9,11 @@ namespace Engine
 {
     class FSTM
     {
-        private Set<Set<State>> start;
-        private Set<Set<State>> final;
+        public Set<Set<State>> start;
+        public Set<Set<State>> final;
         private C5.SortedArray<Input> alphabet;
-        private SortedList<C5.KeyValuePair<Set<State>, Input>, Set<State>> transTable;
-        private Set<Set<State>> states;
+        public SortedList<C5.KeyValuePair<Set<State>, Input>, Set<State>> transTable;
+        public Set<Set<State>> states;
 
         public FSTM(State start, Set<State> final, C5.SortedArray<Input> alphabet, SortedList<C5.KeyValuePair<State, Input>, State> transTable, Set<Set<State>> states)
         {

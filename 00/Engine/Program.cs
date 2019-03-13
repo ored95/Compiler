@@ -7,15 +7,19 @@ namespace Engine
         static void Main(string[] args)
         {
             //string src = "a*";
-            //string src = "b+"
+            //string src = "b+";
             string src = "(ab|c)+aab|b";
             //string src = "(a|b)*aab";
-            bool flag  = true;
 
-            var dfa = Machine.Execute(src, flag);
+            bool flag  = true;
+            bool graph = true;
+
+            var dfa = Machine.Execute(src, flag, graph);
 
             var fsm = Minimization.TableEquivalence(dfa);
-
+            
+            if (graph)
+                Graphviz.SaveMinimizedDFA(fsm);
             fsm.Show();
 
             while (true)

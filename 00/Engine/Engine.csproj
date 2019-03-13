@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="DFA.cs" />
     <Compile Include="FSTM.cs" />
+    <Compile Include="Graphviz.cs" />
     <Compile Include="Minimization.cs" />
     <Compile Include="NFA.cs" />
     <Compile Include="ParseTree.cs" />
