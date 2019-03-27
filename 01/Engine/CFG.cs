@@ -45,10 +45,10 @@ namespace Engine
             {
                 var lines = File.ReadAllLines(fileName);
                 // Check input correct HERE!
-                
+
                 int n = int.Parse(lines[0]);
                 Terminal = new Set<string>(lines[1].Split());
-                
+
                 if (Terminal.Count != n)
                     throw new Exception("Invalid given size of array terminals");
 
@@ -88,6 +88,52 @@ namespace Engine
             }
         }
 
+        public bool Equal(CFG other)
+        {
+            if (NonTerminal == other.NonTerminal && 
+                Terminal == other.Terminal &&
+                StartSymbol == other.StartSymbol)
+            {
+                foreach (var rule in Production)
+                {
+                    if (!other.Production.Contains(rule))
+                        return false;
+                }
+
+                foreach (var rule in other.Production)
+                {
+                    if (!Production.Contains(rule))
+                        return false;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        public void Show(string grammarName)
+        {
+            Set<string> production = new Set<string>();
+
+            foreach (var rule in Production)
+            {
+                var options = string.Join(" | ", rule.Value);
+                var line = rule.Key + " -> " + options;
+                production.Add(line);
+            }
+
+            string cfg = string.Format("{0} = [\n\t[{1}],\n\t[{2}],\n\t[\n\t\t{3}\n\t],\n\t[{4}]\n]\n",
+                grammarName,
+                string.Join(", ", NonTerminal),
+                string.Join(", ", Terminal),
+                string.Join("\n\t\t", production),
+                StartSymbol
+                );
+
+            Console.WriteLine("{0}", cfg);
+        }
+
         public void ExportToFile(string fileName)
         {
             using (var file = new StreamWriter(fileName))
@@ -113,8 +159,8 @@ namespace Engine
         public void UpdateProductionByKey(string key, string removeKeyOption, Set<string> updateRuleOptions)
         {
             KeyValuePair<string, Set<string>> tmp = new KeyValuePair<string, Set<string>>();
-            Set<string> src = new Set<string>();  
-            
+            Set<string> src = new Set<string>();
+
             foreach (var rule in Production)
             {
                 if (rule.Key == key)

@@ -1,11 +1,11 @@
 5
-F E' T' E T
+T T' E E' F
 5
-) + ( a *
+a + * ) (
 5
-F -> (E) | a
-E -> T*FE' | FE'
-E' -> +TE' | ε
-T -> (E)T' | aT'
-T' -> ε | *FT'
+F -> a | (E)
+T -> aT' | (E)T'
+T' -> *FT' | ε
+E -> (E)E' | T*FE' | aE'
+E' -> ε | +TE'
 E

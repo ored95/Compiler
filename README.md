@@ -56,3 +56,7 @@ The following links can help you when dealing with regexes:
 + See also
 1. [CYK Algorithm](https://en.wikipedia.org/wiki/CYK_algorithm)
 2. [LL Parser](https://en.wikipedia.org/wiki/LL_parser)
+
+@ Elimination useless symbols in CFG
+
++ Documentation: Algorithm 2.9 (p. 171) - The theory of parsing, translation and compiling (Vol. 1, 1972 Ru-version).

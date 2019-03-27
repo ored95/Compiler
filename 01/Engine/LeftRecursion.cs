@@ -42,7 +42,7 @@ namespace Engine
                         }
 
                         // 2. Eliminate the direct left recursion from the A[i] productions
-                        
+
                     }
                 }
             }
@@ -72,7 +72,7 @@ namespace Engine
         }
 
         private static bool ContainSymbol(string src, string value) => src.Substring(0, value.Length) == value;
-        
+
         private static Set<string> GetProductionByKey(CFG cfg, string key)
         {
             var result = new Set<string>();
@@ -108,7 +108,7 @@ namespace Engine
                 {
                     result = true;
                     break;
-                }    
+                }
             }
 
             return result;
