@@ -8,8 +8,9 @@ namespace Engine
         {
             //string src = "a*";
             //string src = "b+";
-            string src = "(ab|c)+aab|b";
-            //string src = "(a|b)*aab";
+            //string src = "(ab|c)+aab|b";
+            string src = "(a|b)*aab";
+            //string src = "0(1+";
 
             bool flag  = true;
             bool graph = true;
