@@ -49,8 +49,10 @@ The following links can help you when dealing with regexes:
 </p>
 
 + External links:
-    1. https://en.wikipedia.org/wiki/Left_recursion
-    2. https://web.cs.wpi.edu/~kal/PLT/PLT4.1.2.html
+1. https://en.wikipedia.org/wiki/Left_recursion
+2. https://web.cs.wpi.edu/~kal/PLT/PLT4.1.2.html
+3. [ELR - ITMO University](https://neerc.ifmo.ru/wiki/index.php?title=%D0%A3%D1%81%D1%82%D1%80%D0%B0%D0%BD%D0%B5%D0%BD%D0%B8%D0%B5_%D0%BB%D0%B5%D0%B2%D0%BE%D0%B9_%D1%80%D0%B5%D0%BA%D1%83%D1%80%D1%81%D0%B8%D0%B8)
+
 + See also
-    1. [CYK Algorithm](https://en.wikipedia.org/wiki/CYK_algorithm)
-    2. [LL Parser](https://en.wikipedia.org/wiki/LL_parser)
+1. [CYK Algorithm](https://en.wikipedia.org/wiki/CYK_algorithm)
+2. [LL Parser](https://en.wikipedia.org/wiki/LL_parser)
