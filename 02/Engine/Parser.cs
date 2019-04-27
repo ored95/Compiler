@@ -166,7 +166,7 @@ namespace Engine
                 return (_tokens.Current as NumberConstantToken).Value;
             }
 
-            throw new Exception("Expected a number constant but found " + _tokens.Current);
+            throw new Exception("zExpected a number constant but found " + _tokens.Current);
         }
     }
 }

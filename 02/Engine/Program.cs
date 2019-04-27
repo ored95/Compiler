@@ -14,11 +14,9 @@ namespace Engine
                     string expression = Console.ReadLine();
 
                     var tokens = new Tokenizer(expression).Tokenize();
-                    var parser = new Parser(tokens);
-                    if (parser.Parse())
-                        Console.WriteLine("Result: Accepted!\n");
-                    else
-                        Console.WriteLine("Result: Rejected!\n");
+                    var parser = new ArithmeticExpressionParser(tokens);
+
+                    Console.WriteLine("Result: {0}\n", parser.Parse());
                 }
             //}
             ///catch (Exception exp)

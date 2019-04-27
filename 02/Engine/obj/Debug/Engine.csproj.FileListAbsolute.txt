@@ -1,0 +1,14 @@
+C:\Users\TA\Desktop\Compiler\02\Engine\Engine\bin\Debug\Engine.exe.config
+C:\Users\TA\Desktop\Compiler\02\Engine\Engine\bin\Debug\Engine.exe
+C:\Users\TA\Desktop\Compiler\02\Engine\Engine\bin\Debug\Engine.pdb
+C:\Users\TA\Desktop\Compiler\02\Engine\Engine\obj\Debug\Engine.csprojAssemblyReference.cache
+C:\Users\TA\Desktop\Compiler\02\Engine\Engine\obj\Debug\Engine.csproj.CoreCompileInputs.cache
+C:\Users\TA\Desktop\Compiler\02\Engine\Engine\obj\Debug\Engine.exe
+C:\Users\TA\Desktop\Compiler\02\Engine\Engine\obj\Debug\Engine.pdb
+C:\Users\TA\Desktop\Compiler\02\Engine\bin\Debug\Engine.exe.config
+C:\Users\TA\Desktop\Compiler\02\Engine\bin\Debug\Engine.exe
+C:\Users\TA\Desktop\Compiler\02\Engine\bin\Debug\Engine.pdb
+C:\Users\TA\Desktop\Compiler\02\Engine\obj\Debug\Engine.csprojAssemblyReference.cache
+C:\Users\TA\Desktop\Compiler\02\Engine\obj\Debug\Engine.csproj.CoreCompileInputs.cache
+C:\Users\TA\Desktop\Compiler\02\Engine\obj\Debug\Engine.exe
+C:\Users\TA\Desktop\Compiler\02\Engine\obj\Debug\Engine.pdb
