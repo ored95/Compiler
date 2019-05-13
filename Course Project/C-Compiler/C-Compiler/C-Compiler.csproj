@@ -40,22 +40,32 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Char.cs" />
-    <Compile Include="Float.cs" />
-    <Compile Include="Identifier.cs" />
-    <Compile Include="Int.cs" />
-    <Compile Include="Keyword.cs" />
-    <Compile Include="KeywordValues.cs" />
-    <Compile Include="Operator.cs" />
-    <Compile Include="OperatorValues.cs" />
+    <Compile Include="Lex\Char.cs" />
+    <Compile Include="Lex\Float.cs" />
+    <Compile Include="Lex\Identifier.cs" />
+    <Compile Include="Lex\Int.cs" />
+    <Compile Include="Lex\Keyword.cs" />
+    <Compile Include="Lex\KeywordValues.cs" />
+    <Compile Include="Lex\Operator.cs" />
+    <Compile Include="Lex\OperatorValues.cs" />
+    <Compile Include="Parse\Declarations.cs" />
+    <Compile Include="Parse\Expressions.cs" />
+    <Compile Include="Parse\ExternalDefinitions.cs" />
+    <Compile Include="Parse\Parser.cs" />
+    <Compile Include="Parse\Statements.cs" />
+    <Compile Include="Parse\StorageClassSpecifier.cs" />
+    <Compile Include="Parse\TypeQualifier.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="String.cs" />
-    <Compile Include="Tokens.cs" />
+    <Compile Include="Lex\String.cs" />
+    <Compile Include="Lex\Tokens.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Test\main.c" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
