@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 
+
 // statement: labeled_statement
 //          | compound_statement
 //          | expression_statement
 //          | selection_statement
 //          | iteration_statement
 //          | jump_statement
-public class _statement : IPTNode
+public class _statement : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out Statement stmt)
     {
@@ -18,9 +19,11 @@ public class _statement : IPTNode
             return current;
         }
 
-        current = _compound_statement.Parse(src, begin, out stmt);
+        CompoundStatement compound_stmt;
+        current = _compound_statement.Parse(src, begin, out compound_stmt);
         if (current != -1)
         {
+            stmt = compound_stmt;
             return current;
         }
 
@@ -52,14 +55,12 @@ public class _statement : IPTNode
     }
 }
 
-public class Statement : IASTNode { }
-
 
 // jump_statement: goto identifier ;
 //               | continue ;
 //               | break ;
 //               | return <expression>? ;
-public class _jump_statement : IPTNode
+public class _jump_statement : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out Statement stmt)
     {
@@ -70,12 +71,12 @@ public class _jump_statement : IPTNode
             return -1;
         }
 
-        KeywordValues val = ((TokenKeyword)src[begin]).val;
+        KeywordVal val = ((TokenKeyword)src[begin]).val;
 
         int current = begin + 1;
         switch (val)
         {
-            case KeywordValues.GOTO:
+            case KeywordVal.GOTO:
                 if (src[current].type != TokenType.IDENTIFIER)
                 {
                     return -1;
@@ -83,13 +84,13 @@ public class _jump_statement : IPTNode
                 stmt = new GotoStatement(((TokenIdentifier)src[current]).val);
                 current++;
                 break;
-            case KeywordValues.CONTINUE:
+            case KeywordVal.CONTINUE:
                 current++;
                 break;
-            case KeywordValues.BREAK:
+            case KeywordVal.BREAK:
                 current++;
                 break;
-            case KeywordValues.RETURN:
+            case KeywordVal.RETURN:
                 int saved = current;
                 Expression expr;
                 current = _expression.Parse(src, current, out expr);
@@ -112,38 +113,17 @@ public class _jump_statement : IPTNode
             stmt = null;
             return -1;
         }
+        current++;
+        return current;
 
-        return ++current;
     }
-}
-
-public class GotoStatement : Statement
-{
-    public GotoStatement(string _label)
-    {
-        label = _label;
-    }
-    public string label;
-}
-
-public class ContinueStatement : Statement { }
-
-public class BreakStatement : Statement { }
-
-public class ReturnStatement : Statement
-{
-    public ReturnStatement(Expression _expr)
-    {
-        expr = _expr;
-    }
-    public Expression expr;
 }
 
 
 // compound_statement : { <declaration_list>? <statement_list>? }
-public class _compound_statement : IPTNode
+public class _compound_statement : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out Statement stmt)
+    public static int Parse(List<Token> src, int begin, out CompoundStatement stmt)
     {
         stmt = null;
         if (!Parser.IsLCURL(src[begin]))
@@ -152,16 +132,18 @@ public class _compound_statement : IPTNode
         }
         int current = begin + 1;
 
+        List<Decln> decl_list;
         int saved = current;
-        current = _declaration_list.Parse(src, current, out List<Declaration> decl_list);
+        current = _declaration_list.Parse(src, current, out decl_list);
         if (current == -1)
         {
-            decl_list = new List<Declaration>();
+            decl_list = new List<Decln>();
             current = saved;
         }
 
+        List<Statement> stmt_list;
         saved = current;
-        current = _statement_list.Parse(src, current, out List<Statement> stmt_list);
+        current = _statement_list.Parse(src, current, out stmt_list);
         if (current == -1)
         {
             stmt_list = new List<Statement>();
@@ -179,35 +161,23 @@ public class _compound_statement : IPTNode
     }
 }
 
-public class CompoundStatement : Statement
-{
-    public CompoundStatement(List<Declaration> _decl_list, List<Statement> _stmt_list)
-    {
-        decl_list = _decl_list;
-        stmt_list = _stmt_list;
-    }
-
-    readonly List<Declaration> decl_list;
-    readonly List<Statement> stmt_list;
-}
-
 
 // declaration_list: declaration
 //                 | declaration_list declaration
 // [ note: my solution ]
 // declaration_list: <declaration>+
-public class _declaration_list : IPTNode
+public class _declaration_list : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out List<Declaration> decl_list)
+    public static int Parse(List<Token> src, int begin, out List<Decln> decl_list)
     {
-        decl_list = new List<Declaration>();
-        int current = _declaration.Parse(src, begin, out Declaration decl);
+        decl_list = new List<Decln>();
+        Decln decl;
+        int current = _declaration.Parse(src, begin, out decl);
         if (current == -1)
         {
             return -1;
         }
         decl_list.Add(decl);
-
         int saved;
         while (true)
         {
@@ -227,40 +197,39 @@ public class _declaration_list : IPTNode
 //               | statement_list statement
 // [ note: my solution ]
 // statement_list: <statement>+
-public class _statement_list : IPTNode
+public class _statement_list : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out List<Statement> stmt_list)
     {
-        stmt_list = new List<Statement>();
-        int current = _statement.Parse(src, begin, out Statement stmt);
-        if (current == -1)
-        {
-            return -1;
-        }
-        stmt_list.Add(stmt);
-
-        int saved;
-        while (true)
-        {
-            saved = current;
-            current = _statement.Parse(src, current, out stmt);
-            if (current == -1)
-            {
-                return saved;
-            }
-            stmt_list.Add(stmt);
-        }
+        return Parser.ParseNonEmptyList(src, begin, out stmt_list, _statement.Parse);
+        //stmt_list = new List<Statement>();
+        //Statement stmt;
+        //int current = _statement.Parse(src, begin, out stmt);
+        //if (current == -1) {
+        //    return -1;
+        //}
+        //stmt_list.Add(stmt);
+        //int saved;
+        //while (true) {
+        //    saved = current;
+        //    current = _statement.Parse(src, current, out stmt);
+        //    if (current == -1) {
+        //        return saved;
+        //    }
+        //    stmt_list.Add(stmt);
+        //}
     }
 }
 
 
 // expression_statement: <expression>? ;
-public class _expression_statement : IPTNode
+public class _expression_statement : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out Statement stmt)
     {
         stmt = null;
-        int current = _expression.Parse(src, begin, out Expression expr);
+        Expression expr;
+        int current = _expression.Parse(src, begin, out expr);
         if (current == -1)
         {
             expr = null;
@@ -278,20 +247,11 @@ public class _expression_statement : IPTNode
     }
 }
 
-public class ExpressionStatement : Statement
-{
-    public ExpressionStatement(Expression _expr)
-    {
-        expr = _expr;
-    }
-    public Expression expr;
-}
-
 
 // iteration_statement: while ( expression ) statement
 //                    | do statement while ( expression ) ;
 //                    | for ( <expression>? ; <expression>? ; <expression>? ) statement
-public class _iteration_statement : IPTNode
+public class _iteration_statement : ParseRule
 {
     private static int ParseExpression(List<Token> src, int begin, out Expression expr)
     {
@@ -318,18 +278,20 @@ public class _iteration_statement : IPTNode
     {
         stmt = null;
         int current;
-        if (Parser.IsKeyword(src[begin], KeywordValues.WHILE))
+        if (Parser.IsKeyword(src[begin], KeywordVal.WHILE))
         {
             // while
             current = begin + 1;
 
-            current = ParseExpression(src, current, out Expression cond);
+            Expression cond;
+            current = ParseExpression(src, current, out cond);
             if (current == -1)
             {
                 return -1;
             }
 
-            current = _statement.Parse(src, current, out Statement body);
+            Statement body;
+            current = _statement.Parse(src, current, out body);
             if (current == -1)
             {
                 return -1;
@@ -339,18 +301,20 @@ public class _iteration_statement : IPTNode
             return current;
 
         }
-        else if (Parser.IsKeyword(src[begin], KeywordValues.DO))
+        else if (Parser.IsKeyword(src[begin], KeywordVal.DO))
         {
             // do
             current = begin + 1;
 
-            current = _statement.Parse(src, current, out Statement body);
+            Statement body;
+            current = _statement.Parse(src, current, out body);
             if (current == -1)
             {
                 return -1;
             }
 
-            current = ParseExpression(src, current, out Expression cond);
+            Expression cond;
+            current = ParseExpression(src, current, out cond);
             if (current == -1)
             {
                 return -1;
@@ -360,7 +324,7 @@ public class _iteration_statement : IPTNode
             return current;
 
         }
-        else if (Parser.IsKeyword(src[begin], KeywordValues.FOR))
+        else if (Parser.IsKeyword(src[begin], KeywordVal.FOR))
         {
             // for
             current = begin + 1;
@@ -373,8 +337,9 @@ public class _iteration_statement : IPTNode
             current++;
 
             // match init
+            Expression init;
             int saved = current;
-            current = _expression.Parse(src, current, out Expression init);
+            current = _expression.Parse(src, current, out init);
             if (current == -1)
             {
                 init = null;
@@ -389,8 +354,9 @@ public class _iteration_statement : IPTNode
             current++;
 
             // match cond
+            Expression cond;
             saved = current;
-            current = _expression.Parse(src, current, out Expression cond);
+            current = _expression.Parse(src, current, out cond);
             if (current == -1)
             {
                 init = null;
@@ -421,7 +387,8 @@ public class _iteration_statement : IPTNode
             }
             current++;
 
-            current = _statement.Parse(src, current, out Statement body);
+            Statement body;
+            current = _statement.Parse(src, current, out body);
             if (current == -1)
             {
                 return -1;
@@ -438,48 +405,11 @@ public class _iteration_statement : IPTNode
     }
 }
 
-public class WhileStatement : Statement
-{
-    public WhileStatement(Expression _cond, Statement _body)
-    {
-        cond = _cond;
-        body = _body;
-    }
-    public Expression cond;
-    public Statement body;
-}
-
-public class DoWhileStatement : Statement
-{
-    public DoWhileStatement(Statement _body, Expression _cond)
-    {
-        body = _body;
-        cond = _cond;
-    }
-    public Statement body;
-    public Expression cond;
-}
-
-public class ForStatement : Statement
-{
-    public ForStatement(Expression _init, Expression _cond, Expression _loop, Statement _body)
-    {
-        init = _init;
-        cond = _cond;
-        loop = _loop;
-        body = _body;
-    }
-    public Expression init;
-    public Expression cond;
-    public Expression loop;
-    public Statement body;
-}
-
 
 // selection_statement: if ( expression ) statement
 //                    | if ( expression ) statement else statement
 //                    | switch ( expression ) statement
-public class _selection_statement : IPTNode
+public class _selection_statement : ParseRule
 {
     private static int ParseExpression(List<Token> src, int begin, out Expression expr)
     {
@@ -508,7 +438,7 @@ public class _selection_statement : IPTNode
 
         int current;
         Expression expr;
-        if (Parser.IsKeyword(src[begin], KeywordValues.SWITCH))
+        if (Parser.IsKeyword(src[begin], KeywordVal.SWITCH))
         {
             // switch
             current = begin + 1;
@@ -528,7 +458,7 @@ public class _selection_statement : IPTNode
             return current;
 
         }
-        else if (Parser.IsKeyword(src[begin], KeywordValues.IF))
+        else if (Parser.IsKeyword(src[begin], KeywordVal.IF))
         {
             // if
             current = begin + 1;
@@ -537,18 +467,20 @@ public class _selection_statement : IPTNode
             {
                 return -1;
             }
-            current = _statement.Parse(src, current, out Statement true_stmt);
+            Statement true_stmt;
+            current = _statement.Parse(src, current, out true_stmt);
             if (current == -1)
             {
                 return -1;
             }
-            if (!Parser.IsKeyword(src[current], KeywordValues.ELSE))
+            if (!Parser.IsKeyword(src[current], KeywordVal.ELSE))
             {
                 stmt = new IfStatement(expr, true_stmt);
                 return current;
             }
             current++;
-            current = _statement.Parse(src, current, out Statement false_stmt);
+            Statement false_stmt;
+            current = _statement.Parse(src, current, out false_stmt);
             if (current == -1)
             {
                 return -1;
@@ -564,53 +496,18 @@ public class _selection_statement : IPTNode
     }
 }
 
-public class SwitchStatement : Statement
-{
-    public SwitchStatement(Expression _expr, Statement _stmt)
-    {
-        expr = _expr;
-        stmt = _stmt;
-    }
-    public Expression expr;
-    public Statement stmt;
-}
-
-public class IfStatement : Statement
-{
-    public IfStatement(Expression _cond, Statement _stmt)
-    {
-        cond = _cond;
-        stmt = _stmt;
-    }
-    public Expression cond;
-    public Statement stmt;
-}
-
-public class IfElseStatement : Statement
-{
-    public IfElseStatement(Expression _cond, Statement _true_stmt, Statement _false_stmt)
-    {
-        cond = _cond;
-        true_stmt = _true_stmt;
-        false_stmt = _false_stmt;
-    }
-    public Expression cond;
-    public Statement true_stmt;
-    public Statement false_stmt;
-}
-
 
 // labeled_statement : identifier : statement
 //                   | case constant_expression : statement
 //                   | default : statement
-public class _labeled_statement : IPTNode
+public class _labeled_statement : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out Statement stmt)
     {
         stmt = null;
 
         int current;
-        if (Parser.IsKeyword(src[begin], KeywordValues.DEFAULT))
+        if (Parser.IsKeyword(src[begin], KeywordVal.DEFAULT))
         {
             current = begin + 1;
 
@@ -632,12 +529,13 @@ public class _labeled_statement : IPTNode
             return current;
 
         }
-        else if (Parser.IsKeyword(src[begin], KeywordValues.CASE))
+        else if (Parser.IsKeyword(src[begin], KeywordVal.CASE))
         {
             current = begin + 1;
 
             // match expr
-            current = _constant_expression.Parse(src, current, out Expression expr);
+            Expression expr;
+            current = _constant_expression.Parse(src, current, out expr);
             if (current == -1)
             {
                 return -1;
@@ -688,28 +586,7 @@ public class _labeled_statement : IPTNode
         {
             return -1;
         }
-    }
-}
 
-public class LabeledStatement : Statement
-{
-    public LabeledStatement(String _label, Statement _stmt)
-    {
-        label = _label;
-        stmt = _stmt;
-    }
-    public String label;
-    public Statement stmt;
-}
 
-public class CaseStatement : Statement
-{
-    public CaseStatement(Expression _expr, Statement _stmt)
-    {
-        expr = _expr;
-        stmt = _stmt;
     }
-    // expr == null means 'default'
-    public Expression expr;
-    public Statement stmt;
 }

@@ -1,5 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+
+public class ParserEnvironment
+{
+    public static bool debug = false;
+}
 
 public class Parser
 {
@@ -7,7 +13,7 @@ public class Parser
     {
         if (token.type == TokenType.KEYWORD)
         {
-            if (((TokenKeyword)token).val == KeywordValues.SIZEOF)
+            if (((TokenKeyword)token).val == KeywordVal.SIZEOF)
             {
                 return true;
             }
@@ -19,7 +25,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.LPAREN)
+            if (((TokenOperator)token).val == OperatorVal.LPAREN)
             {
                 return true;
             }
@@ -31,7 +37,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.RPAREN)
+            if (((TokenOperator)token).val == OperatorVal.RPAREN)
             {
                 return true;
             }
@@ -43,7 +49,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.COLON)
+            if (((TokenOperator)token).val == OperatorVal.COLON)
             {
                 return true;
             }
@@ -55,7 +61,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.QUESTION)
+            if (((TokenOperator)token).val == OperatorVal.QUESTION)
             {
                 return true;
             }
@@ -67,7 +73,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.ASSIGN)
+            if (((TokenOperator)token).val == OperatorVal.ASSIGN)
             {
                 return true;
             }
@@ -79,7 +85,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.COMMA)
+            if (((TokenOperator)token).val == OperatorVal.COMMA)
             {
                 return true;
             }
@@ -91,7 +97,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.LCURL)
+            if (((TokenOperator)token).val == OperatorVal.LCURL)
             {
                 return true;
             }
@@ -103,7 +109,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.RCURL)
+            if (((TokenOperator)token).val == OperatorVal.RCURL)
             {
                 return true;
             }
@@ -115,7 +121,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.LBRACKET)
+            if (((TokenOperator)token).val == OperatorVal.LBRACKET)
             {
                 return true;
             }
@@ -127,7 +133,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.RBRACKET)
+            if (((TokenOperator)token).val == OperatorVal.RBRACKET)
             {
                 return true;
             }
@@ -139,7 +145,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.PERIOD)
+            if (((TokenOperator)token).val == OperatorVal.PERIOD)
             {
                 return true;
             }
@@ -149,13 +155,13 @@ public class Parser
 
     public static bool IsEllipsis(List<Token> src, int begin)
     {
-        if (IsPERIOD(src[begin]))
+        if (Parser.IsPERIOD(src[begin]))
         {
             begin++;
-            if (IsPERIOD(src[begin]))
+            if (Parser.IsPERIOD(src[begin]))
             {
                 begin++;
-                if (IsPERIOD(src[begin]))
+                if (Parser.IsPERIOD(src[begin]))
                 {
                     return true;
                 }
@@ -168,7 +174,7 @@ public class Parser
     {
         if (token.type == TokenType.OPERATOR)
         {
-            if (((TokenOperator)token).val == OperatorValues.SEMICOLON)
+            if (((TokenOperator)token).val == OperatorVal.SEMICOLON)
             {
                 return true;
             }
@@ -176,7 +182,7 @@ public class Parser
         return false;
     }
 
-    public static bool IsKeyword(Token token, KeywordValues val)
+    public static bool IsKeyword(Token token, KeywordVal val)
     {
         if (token.type == TokenType.KEYWORD)
         {
@@ -188,7 +194,7 @@ public class Parser
         return false;
     }
 
-    public static bool IsOperator(Token token, OperatorValues val)
+    public static bool IsOperator(Token token, OperatorVal val)
     {
         if (token.type == TokenType.OPERATOR)
         {
@@ -200,7 +206,7 @@ public class Parser
         return false;
     }
 
-    public static string GetIdentifierValue(Token token)
+    public static String GetIdentifierValue(Token token)
     {
         if (token.type == TokenType.IDENTIFIER)
         {
@@ -212,155 +218,128 @@ public class Parser
         }
     }
 
-    public static List<Token> GetTokensFromString(string src)
+    public static List<Token> GetTokensFromString(String src)
     {
-        LexicalAnalysis lex = new LexicalAnalysis();
+        Scanner lex = new Scanner();
         lex.src = src;
         lex.Lex();
         return lex.tokens;
     }
 
-}
-
-public class ParserEnvironment
-{
-    public static bool debug = false;
-}
-
-public class Scope
-{
-    public Scope()
+    // EatOperator : (src, ref current, val) -> bool
+    // =============================================
+    // tries to eat an operator
+    // if succeed, current++, return true
+    // if fail, current remains the same, return false
+    // 
+    public static bool EatOperator(List<Token> src, ref int current, OperatorVal val)
     {
-        vars = new List<string>();
-        typedef_names = new List<string>();
-    }
-
-    public bool HasVariable(string var)
-    {
-        return vars.FindIndex(x => x == var) != -1;
-    }
-
-    public bool HasTypedefName(string type)
-    {
-        return typedef_names.FindIndex(x => x == type) != -1;
-    }
-
-    public bool HasIdentifier(string id)
-    {
-        return HasVariable(id) || HasTypedefName(id);
-    }
-
-    public void AddTypedefName(string type)
-    {
-        typedef_names.Add(type);
-    }
-
-    public List<string> typedef_names;
-    public List<string> vars;
-}
-
-public class ScopeSandbox
-{
-    public ScopeSandbox()
-    {
-        scopes = new Stack<Scope>();
-        scopes.Push(new Scope());
-    }
-
-    public void InScope()
-    {
-        scopes.Push(new Scope());
-    }
-
-    public void OutScope()
-    {
-        scopes.Pop();
-    }
-
-    public bool HasVariable(string var)
-    {
-        return scopes.Peek().HasVariable(var);
-    }
-
-    public bool HasTypedefName(string type)
-    {
-        return scopes.Peek().HasTypedefName(type);
-    }
-
-    public void AddTypedefName(string type)
-    {
-        scopes.Peek().AddTypedefName(type);
-    }
-
-    public bool HasIdentifier(string id)
-    {
-        return scopes.Peek().HasIdentifier(id);
-    }
-
-    public Stack<Scope> scopes;
-}
-
-static class ScopeEnvironment
-{
-    static ScopeEnvironment()
-    {
-        sandboxes = new Stack<ScopeSandbox>();
-        sandboxes.Push(new ScopeSandbox());
-    }
-
-    public static void PushSandbox()
-    {
-        if (sandboxes.Count == 0)
+        if (src[current].type != TokenType.OPERATOR)
         {
-            return;
+            return false;
         }
-        sandboxes.Push(sandboxes.Peek());
-    }
 
-    public static void PopSandbox()
-    {
-        if (sandboxes.Count < 2)
+        if (((TokenOperator)src[current]).val != val)
         {
-            return;
+            return false;
         }
-        ScopeSandbox top = sandboxes.Pop();
-        sandboxes.Pop();
-        sandboxes.Push(top);
+
+        current++;
+        return true;
     }
 
-    public static void InScope()
+    public delegate int FParse<TRet>(List<Token> src, int begin, out TRet node) where TRet : PTNode;
+
+    public static int ParseOptional<TRet>(List<Token> src, int begin, TRet default_val, out TRet node, FParse<TRet> Parse) where TRet : PTNode
     {
-        sandboxes.Peek().InScope();
+        int current;
+        if ((current = Parse(src, begin, out node)) == -1)
+        {
+            // if parsing fails: return default value
+            node = default_val;
+            return begin;
+        }
+        else
+        {
+            return current;
+        }
     }
 
-    public static void OutScope()
+    public static int ParseList<TRet>(List<Token> src, int begin, out List<TRet> list, FParse<TRet> Parse) where TRet : PTNode
     {
-        sandboxes.Peek().OutScope();
+        int current = begin;
+
+        list = new List<TRet>();
+        TRet item;
+
+        while (true)
+        {
+            int saved = current;
+            if ((current = Parse(src, current, out item)) == -1)
+            {
+                return saved;
+            }
+            list.Add(item);
+        }
+
     }
 
-    public static bool HasVariable(string var)
+    public static int ParseNonEmptyList<TRet>(List<Token> src, int begin, out List<TRet> list, FParse<TRet> Parse) where TRet : PTNode
     {
-        return sandboxes.Peek().HasVariable(var);
+        begin = ParseList<TRet>(src, begin, out list, Parse);
+        if (list.Any())
+        {
+            return begin;
+        }
+        else
+        {
+            return -1;
+        }
     }
 
-    public static bool HasTypedefName(string type)
+    public static int Parse2Choices<TRet, T1, T2>(List<Token> src, int begin, out TRet node, FParse<T1> Parse1, FParse<T2> Parse2)
+        where T1 : TRet
+        where T2 : TRet
+        where TRet : PTNode
     {
-        return sandboxes.Peek().HasTypedefName(type);
+        int ret;
+
+        T1 node1;
+        if ((ret = Parse1(src, begin, out node1)) != -1)
+        {
+            node = node1;
+            return ret;
+        }
+
+        T2 node2;
+        if ((ret = Parse2(src, begin, out node2)) != -1)
+        {
+            node = node2;
+            return ret;
+        }
+
+        node = null;
+        return -1;
     }
 
-    public static void AddTypedefName(string type)
+    public static int ParseNonEmptyListWithSep<TRet>(List<Token> src, int pos, out List<TRet> list, FParse<TRet> Parse, OperatorVal op) where TRet : PTNode
     {
-        sandboxes.Peek().AddTypedefName(type);
-    }
+        list = new List<TRet>();
+        TRet item;
 
-    public static bool HasIdentifier(string id)
-    {
-        return sandboxes.Peek().HasIdentifier(id);
-    }
+        if ((pos = Parse(src, pos, out item)) == -1)
+            return -1;
+        list.Add(item);
 
-    public static Stack<ScopeSandbox> sandboxes;
+        while (true)
+        {
+            int saved = pos;
+            if (!Parser.EatOperator(src, ref pos, op))
+                return saved;
+            if ((pos = Parse(src, pos, out item)) == -1)
+                return saved;
+            list.Add(item);
+        }
+
+    }
 }
-
-public interface IPTNode { }
-
-public interface IASTNode { }

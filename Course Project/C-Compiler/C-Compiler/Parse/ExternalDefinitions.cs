@@ -1,67 +1,95 @@
 ﻿using System.Collections.Generic;
 
 // translation_unit : [external_declaration]+
-public class _translation_unit : IPTNode
+public class _translation_unit : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out List<IASTNode> unit)
+    public static bool Test()
     {
-        unit = null;
-
-        int current = _external_declaration.Parse(src, begin, out IASTNode node);
+        var src = Parser.GetTokensFromString("int a; int b() { return 1; }");
+        TranslationUnit unit;
+        int current = Parse(src, 0, out unit);
         if (current == -1)
         {
+            return false;
+        }
+
+        src = Parser.GetTokensFromString("int a() { return 1; } int b;");
+        current = Parse(src, 0, out unit);
+        if (current == -1)
+        {
+            return false;
+        }
+
+        src = Parser.GetTokensFromString("int a");
+        current = Parse(src, 0, out unit);
+        if (current != -1)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static int Parse(List<Token> src, int pos, out TranslationUnit unit)
+    {
+        List<ExternalDeclaration> list;
+        int current;
+        if ((current = Parser.ParseNonEmptyList(src, pos, out list, _external_declaration.Parse)) != -1)
+        {
+            unit = new TranslationUnit(list);
+            return current;
+        }
+        else
+        {
+            unit = null;
             return -1;
         }
-
-        unit = new List<IASTNode>
-        {
-            node
-        };
-
-        int saved;
-        while (true)
-        {
-            saved = current;
-            current = _external_declaration.Parse(src, current, out node);
-            if (current == -1)
-            {
-                return saved;
-            }
-            unit.Add(node);
-        }
     }
+
 }
-
-
 // external_declaration: function_definition | declaration
-public class _external_declaration : IPTNode
+public class _external_declaration : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out IASTNode node)
+    public static bool Test()
     {
-        node = null;
-
-        int current = _function_definition.Parse(src, begin, out FunctionDefinition func_def);
-        if (current != -1)
+        var src = Parser.GetTokensFromString("int a;");
+        ExternalDeclaration node;
+        int current = Parse(src, 0, out node);
+        if (current == -1)
         {
-            node = func_def;
-            return current;
+            return false;
         }
 
-        current = _declaration.Parse(src, begin, out Declaration decl);
-        if (current != -1)
+        src = Parser.GetTokensFromString("int a() { return 1; }");
+        current = Parse(src, 0, out node);
+        if (current == -1)
         {
-            node = decl;
-            return current;
+            return false;
         }
 
-        return -1;
+        return true;
+    }
+
+    public static int Parse(List<Token> src, int pos, out ExternalDeclaration node)
+    {
+        return Parser.Parse2Choices<ExternalDeclaration, FunctionDefinition, Decln>(src, pos, out node, _function_definition.Parse, _declaration.Parse);
     }
 }
 
 
 // function_definition : [declaration_specifiers]? declarator [declaration_list]? compound_statement
 //
-// function prototypes should always be like this:
+// NOTE: the optional declaration_list is for the **old-style** function prototype like this:
+// +-------------------------------+
+// |    int foo(param1, param2)    |
+// |    int param1;                |
+// |    char param2;               |
+// |    {                          |
+// |        ....                   |
+// |    }                          |
+// +-------------------------------+
+//
+// i'm **not** going to support this style. function prototypes should always be like this:
 // +------------------------------------------+
 // |    int foo(int param1, char param2) {    |
 // |        ....                              |
@@ -75,12 +103,13 @@ public class _external_declaration : IPTNode
 //
 // FAIL: null
 //
-public class _function_definition : IPTNode
+public class _function_definition : ParseRule
 {
     public static bool Test()
     {
         var src = Parser.GetTokensFromString("int add(int a, int b) { return a + b; }");
-        int current = Parse(src, 0, out FunctionDefinition def);
+        FunctionDefinition def;
+        int current = Parse(src, 0, out def);
         if (current == -1)
         {
             return false;
@@ -92,16 +121,17 @@ public class _function_definition : IPTNode
     public static int Parse(List<Token> src, int begin, out FunctionDefinition def)
     {
         // try to match declaration_specifiers, if not found, create an empty one.
-        DeclarationSpecifiers specs;
+        DeclnSpecs specs;
         int current = _declaration_specifiers.Parse(src, begin, out specs);
         if (current == -1)
         {
-            specs = new DeclarationSpecifiers(new List<StorageClassSpecifier>(), new List<TypeSpecifier>(), new List<TypeQualifier>());
+            specs = new DeclnSpecs(new List<StorageClassSpecifier>(), new List<TypeSpec>(), new List<TypeQualifier>());
             current = begin;
         }
 
         // match declarator
-        current = _declarator.Parse(src, current, out Declarator decl);
+        Declr decl;
+        current = _declarator.Parse(src, current, out decl);
         if (current == -1)
         {
             def = null;
@@ -109,7 +139,8 @@ public class _function_definition : IPTNode
         }
 
         // match compound_statement
-        current = _compound_statement.Parse(src, current, out Statement stmt);
+        CompoundStatement stmt;
+        current = _compound_statement.Parse(src, current, out stmt);
         if (current == -1)
         {
             def = null;
@@ -119,17 +150,4 @@ public class _function_definition : IPTNode
         def = new FunctionDefinition(specs, decl, stmt);
         return current;
     }
-}
-
-public class FunctionDefinition : IASTNode
-{
-    public FunctionDefinition(DeclarationSpecifiers _specs, Declarator _decl, Statement _stmt)
-    {
-        specs = _specs;
-        decl = _decl;
-        stmt = _stmt;
-    }
-    public DeclarationSpecifiers specs;
-    public Declarator decl;
-    public Statement stmt;
 }

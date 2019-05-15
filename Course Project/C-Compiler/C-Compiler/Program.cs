@@ -7,13 +7,14 @@ namespace C_Compiler
     {
         public static void Main(string[] args)
         {
-            var LA = new LexicalAnalysis();
+            var LA = new Scanner();
             LA.OpenFile(@"../../Test/main.c");
 
             LA.Lex();
-            //List<Token> tokens = LA.tokens;
-            int current = _translation_unit.Parse(LA.tokens, 0, out List<IASTNode> root);
-            //Console.Write(current);
+
+            int current = _translation_unit.Parse(LA.tokens, 0, out TranslationUnit root);
+
+            //Console.Write(root.ToString());
             Console.ReadLine();
         }
     }

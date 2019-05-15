@@ -3,48 +3,48 @@ using System.Collections.Generic;
 
 public class TokenKeyword : Token
 {
-    public TokenKeyword()
+    public TokenKeyword(KeywordVal _val)
+        : base(TokenType.KEYWORD)
     {
-        type = TokenType.KEYWORD;
+        val = _val;
     }
-    public KeywordValues val;
-
-    public static Dictionary<string, KeywordValues> keywords = new Dictionary<string, KeywordValues>(StringComparer.InvariantCultureIgnoreCase) {
-        { "AUTO",        KeywordValues.AUTO      },
-        { "DOUBLE",      KeywordValues.DOUBLE    },
-        { "INT",         KeywordValues.INT       },
-        { "STRUCT",      KeywordValues.STRUCT    },
-        { "BREAK",       KeywordValues.BREAK     },
-        { "ELSE",        KeywordValues.ELSE      },
-        { "LONG",        KeywordValues.LONG      },
-        { "SWITCH",      KeywordValues.SWITCH    },
-        { "CASE",        KeywordValues.CASE      },
-        { "ENUM",        KeywordValues.ENUM      },
-        { "REGISTER",    KeywordValues.REGISTER  },
-        { "TYPEDEF",     KeywordValues.TYPEDEF   },
-        { "CHAR",        KeywordValues.CHAR      },
-        { "EXTERN",      KeywordValues.EXTERN    },
-        { "RETURN",      KeywordValues.RETURN    },
-        { "UNION",       KeywordValues.UNION     },
-        { "CONST",       KeywordValues.CONST     },
-        { "FLOAT",       KeywordValues.FLOAT     },
-        { "SHORT",       KeywordValues.SHORT     },
-        { "UNSIGNED",    KeywordValues.UNSIGNED  },
-        { "CONTINUE",    KeywordValues.CONTINUE  },
-        { "FOR",         KeywordValues.FOR       },
-        { "SIGNED",      KeywordValues.SIGNED    },
-        { "VOID",        KeywordValues.VOID      },
-        { "DEFAULT",     KeywordValues.DEFAULT   },
-        { "GOTO",        KeywordValues.GOTO      },
-        { "SIZEOF",      KeywordValues.SIZEOF    },
-        { "VOLATILE",    KeywordValues.VOLATILE  },
-        { "DO",          KeywordValues.DO        },
-        { "IF",          KeywordValues.IF        },
-        { "STATIC",      KeywordValues.STATIC    },
-        { "WHILE",       KeywordValues.WHILE     }
+    public readonly KeywordVal val;
+    public static Dictionary<String, KeywordVal> keywords = new Dictionary<String, KeywordVal>(StringComparer.InvariantCultureIgnoreCase) {
+        { "AUTO",        KeywordVal.AUTO      },
+        { "DOUBLE",      KeywordVal.DOUBLE    },
+        { "INT",         KeywordVal.INT       },
+        { "STRUCT",      KeywordVal.STRUCT    },
+        { "BREAK",       KeywordVal.BREAK     },
+        { "ELSE",        KeywordVal.ELSE      },
+        { "LONG",        KeywordVal.LONG      },
+        { "SWITCH",      KeywordVal.SWITCH    },
+        { "CASE",        KeywordVal.CASE      },
+        { "ENUM",        KeywordVal.ENUM      },
+        { "REGISTER",    KeywordVal.REGISTER  },
+        { "TYPEDEF",     KeywordVal.TYPEDEF   },
+        { "CHAR",        KeywordVal.CHAR      },
+        { "EXTERN",      KeywordVal.EXTERN    },
+        { "RETURN",      KeywordVal.RETURN    },
+        { "UNION",       KeywordVal.UNION     },
+        { "CONST",       KeywordVal.CONST     },
+        { "FLOAT",       KeywordVal.FLOAT     },
+        { "SHORT",       KeywordVal.SHORT     },
+        { "UNSIGNED",    KeywordVal.UNSIGNED  },
+        { "CONTINUE",    KeywordVal.CONTINUE  },
+        { "FOR",         KeywordVal.FOR       },
+        { "SIGNED",      KeywordVal.SIGNED    },
+        { "VOID",        KeywordVal.VOID      },
+        { "DEFAULT",     KeywordVal.DEFAULT   },
+        { "GOTO",        KeywordVal.GOTO      },
+        { "SIZEOF",      KeywordVal.SIZEOF    },
+        { "VOLATILE",    KeywordVal.VOLATILE  },
+        { "DO",          KeywordVal.DO        },
+        { "IF",          KeywordVal.IF        },
+        { "STATIC",      KeywordVal.STATIC    },
+        { "WHILE",       KeywordVal.WHILE     }
     };
 
-    public override string ToString()
+    public override String ToString()
     {
         return type.ToString() + ": " + val.ToString();
     }

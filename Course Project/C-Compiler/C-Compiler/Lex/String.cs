@@ -1,12 +1,21 @@
-﻿public class TokenString : Token
+﻿using System;
+
+// String literal
+// --------------
+public class TokenString : Token
 {
-    public TokenString()
+    public TokenString(String _val, Int32 _idx, String _raw)
+        : base(TokenType.STRING)
     {
-        type = TokenType.STRING;
+        val = _val;
+        idx = _idx;
+        raw = _raw;
     }
-    public string raw;
-    public string val;
-    public override string ToString()
+    public readonly String raw;
+    public readonly String val;
+    public readonly int idx;
+
+    public override String ToString()
     {
         return type.ToString() + ": " + "\"" + raw + "\"" + "\n\"" + val + "\"";
     }
@@ -14,7 +23,7 @@
 
 public class FSAString : FSA
 {
-    public enum StringState
+    private enum State
     {
         START,
         END,
@@ -24,34 +33,38 @@ public class FSAString : FSA
         QQ
     };
 
-    public StringState state;
+    private State state;
+    private FSAChar fsachar;
+    public String val;
+    public String raw;
+
     public FSAString()
     {
-        state = StringState.START;
+        state = State.START;
         fsachar = new FSAChar('\"');
         raw = "";
         val = "";
     }
 
-    public void Reset()
+    public override sealed void Reset()
     {
-        state = StringState.START;
+        state = State.START;
         fsachar.Reset();
         raw = "";
         val = "";
     }
 
-    public FSAStatus GetStatus()
+    public override sealed FSAStatus GetStatus()
     {
-        if (state == StringState.START)
+        if (state == State.START)
         {
             return FSAStatus.NONE;
         }
-        else if (state == StringState.END)
+        else if (state == State.END)
         {
             return FSAStatus.END;
         }
-        else if (state == StringState.ERROR)
+        else if (state == State.ERROR)
         {
             return FSAStatus.ERROR;
         }
@@ -61,55 +74,55 @@ public class FSAString : FSA
         }
     }
 
-    public string val;
-    public string raw;
-    public Token RetrieveToken()
+    public override sealed Token RetrieveToken()
     {
-        TokenString token = new TokenString();
-        token.type = TokenType.STRING;
-        token.val = val;
-        token.raw = raw;
-        return token;
+        int idx;
+        if ((idx = StringTable.entrys.FindIndex(x => x == raw)) == -1)
+        {
+            StringTable.entrys.Add(raw);
+            idx = StringTable.entrys.Count - 1;
+        }
+        return new TokenString(val, idx, raw);
     }
 
-    public void ReadChar(char ch)
+    public override sealed void ReadChar(Char ch)
     {
         switch (state)
         {
-            case StringState.END:
-            case StringState.ERROR:
-                state = StringState.ERROR;
+            case State.END:
+            case State.ERROR:
+                state = State.ERROR;
                 break;
-            case StringState.START:
+            case State.START:
                 switch (ch)
                 {
                     case 'L':
-                        state = StringState.L;
+                        state = State.L;
                         break;
                     case '\"':
-                        state = StringState.Q;
+                        state = State.Q;
                         fsachar.Reset();
                         break;
                     default:
-                        state = StringState.ERROR;
+                        state = State.ERROR;
                         break;
                 }
                 break;
-            case StringState.L:
+            case State.L:
                 if (ch == '\"')
                 {
-                    state = StringState.Q;
+                    state = State.Q;
                     fsachar.Reset();
                 }
                 else
                 {
-                    state = StringState.ERROR;
+                    state = State.ERROR;
                 }
                 break;
-            case StringState.Q:
+            case State.Q:
                 if (fsachar.GetStatus() == FSAStatus.NONE && ch == '\"')
                 {
-                    state = StringState.QQ;
+                    state = State.QQ;
                     fsachar.Reset();
                 }
                 else
@@ -118,40 +131,39 @@ public class FSAString : FSA
                     switch (fsachar.GetStatus())
                     {
                         case FSAStatus.END:
-                            state = StringState.Q;
+                            state = State.Q;
                             val = val + fsachar.RetrieveChar();
                             raw = raw + fsachar.RetrieveRaw();
                             fsachar.Reset();
                             ReadChar(ch);
                             break;
                         case FSAStatus.ERROR:
-                            state = StringState.ERROR;
+                            state = State.ERROR;
                             break;
                         default:
                             break;
                     }
                 }
                 break;
-            case StringState.QQ:
-                state = StringState.END;
+            case State.QQ:
+                state = State.END;
                 break;
             default:
-                state = StringState.ERROR;
+                state = State.ERROR;
                 break;
         }
     }
 
-    public void ReadEOF()
+    public override sealed void ReadEOF()
     {
-        if (state == StringState.QQ)
+        if (state == State.QQ)
         {
-            state = StringState.END;
+            state = State.END;
         }
         else
         {
-            state = StringState.ERROR;
+            state = State.ERROR;
         }
     }
 
-    private FSAChar fsachar;
 }

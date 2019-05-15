@@ -1,7 +1,7 @@
 ﻿// operator
 // --------
 // note that '...' is recognized as three '.'s
-public enum OperatorValues
+public enum OperatorVal
 {
     LBRACKET,
     RBRACKET,

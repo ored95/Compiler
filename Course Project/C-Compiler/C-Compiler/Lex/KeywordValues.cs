@@ -1,4 +1,6 @@
-﻿public enum KeywordValues
+﻿// keyword
+// -------
+public enum KeywordVal
 {
     AUTO,
     DOUBLE,

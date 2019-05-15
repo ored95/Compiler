@@ -1,14 +1,18 @@
-﻿// identifier
-// ----------
-// if the identifier is found to be a keyword, then it will be a keyword
+﻿using System;
+
+// TokenIdentifier
+// ===============
+// If the identifier is found to be a keyword, then it will be a keyword
+// 
 public class TokenIdentifier : Token
 {
-    public TokenIdentifier()
+    public TokenIdentifier(String _val)
+        : base(TokenType.IDENTIFIER)
     {
-        type = TokenType.IDENTIFIER;
+        val = _val;
     }
-    public string val;
-    public override string ToString()
+    public readonly String val;
+    public override String ToString()
     {
         return type.ToString() + ": " + val;
     }
@@ -16,35 +20,39 @@ public class TokenIdentifier : Token
 
 public class FSAIdentifier : FSA
 {
-    public enum IdState
+    private enum State
     {
         START,
         END,
         ERROR,
         ID
     };
-    public IdState state;
+    private State state;
+    private String scanned;
+
     public FSAIdentifier()
     {
-        state = IdState.START;
-        str = "";
+        state = State.START;
+        scanned = "";
     }
-    public void Reset()
+
+    public override sealed void Reset()
     {
-        state = IdState.START;
-        str = "";
+        state = State.START;
+        scanned = "";
     }
-    public FSAStatus GetStatus()
+
+    public override sealed FSAStatus GetStatus()
     {
-        if (state == IdState.START)
+        if (state == State.START)
         {
             return FSAStatus.NONE;
         }
-        else if (state == IdState.END)
+        else if (state == State.END)
         {
             return FSAStatus.END;
         }
-        else if (state == IdState.ERROR)
+        else if (state == State.ERROR)
         {
             return FSAStatus.ERROR;
         }
@@ -54,72 +62,61 @@ public class FSAIdentifier : FSA
         }
     }
 
-    string str;
-    private bool IsNonDigit(char ch)
+    public override sealed Token RetrieveToken()
     {
-        return (ch == '_' || char.IsLetter(ch));
-    }
-
-    public Token RetrieveToken()
-    {
-        if (TokenKeyword.keywords.ContainsKey(str.Substring(0, str.Length - 1)))
+        String name = scanned.Substring(0, scanned.Length - 1);
+        if (TokenKeyword.keywords.ContainsKey(name))
         {
-            TokenKeyword token = new TokenKeyword();
-            token.type = TokenType.KEYWORD;
-            token.val = TokenKeyword.keywords[str.Substring(0, str.Length - 1)];
-            return token;
+            return new TokenKeyword(TokenKeyword.keywords[name]);
         }
         else
         {
-            TokenIdentifier token = new TokenIdentifier();
-            token.type = TokenType.IDENTIFIER;
-            token.val = str.Substring(0, str.Length - 1);
-            return token;
+            return new TokenIdentifier(name);
         }
     }
 
-    public void ReadChar(char ch)
+    public override sealed void ReadChar(Char ch)
     {
-        str = str + ch;
+        scanned = scanned + ch;
         switch (state)
         {
-            case IdState.END:
-            case IdState.ERROR:
-                state = IdState.ERROR;
+            case State.END:
+            case State.ERROR:
+                state = State.ERROR;
                 break;
-            case IdState.START:
-                if (IsNonDigit(ch))
+            case State.START:
+                if (ch == '_' || Char.IsLetter(ch))
                 {
-                    state = IdState.ID;
+                    state = State.ID;
                 }
                 else
                 {
-                    state = IdState.ERROR;
+                    state = State.ERROR;
                 }
                 break;
-            case IdState.ID:
-                if (IsNonDigit(ch) || char.IsDigit(ch))
+            case State.ID:
+                if (Char.IsLetterOrDigit(ch) || ch == '_')
                 {
-                    state = IdState.ID;
+                    state = State.ID;
                 }
                 else
                 {
-                    state = IdState.END;
+                    state = State.END;
                 }
                 break;
         }
     }
 
-    public void ReadEOF()
+    public override sealed void ReadEOF()
     {
-        str = str + '0';
+        scanned = scanned + '0';
         switch (state)
         {
-            case IdState.ID:
-                state = IdState.END;
+            case State.ID:
+                state = State.END;
                 break;
             default:
-                state = IdState.ERROR;
+                state = State.ERROR;
                 break;
         }
     }

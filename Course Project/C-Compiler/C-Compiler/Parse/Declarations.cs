@@ -3,59 +3,63 @@ using System.Collections.Generic;
 
 // declaration : declaration_specifiers [init_declarator_list]? ;
 // [ return: Declaration ]
-public class _declaration : IPTNode
+// 
+public class _declaration : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out Declaration declaration)
+    public static bool Test()
     {
-        declaration = null;
+        List<Token> src = Parser.GetTokensFromString("static int a = 3, *b = 0, **c = 3;");
+        Decln decl;
+        int current = Parse(src, 0, out decl);
+        return current != -1;
+    }
 
-        int current = _declaration_specifiers.Parse(src, begin, out DeclarationSpecifiers declaration_specifiers);
+    public static int Parse(List<Token> src, int pos, out Decln declaration)
+    {
+
+        DeclnSpecs decl_specs;
+        int current = _declaration_specifiers.Parse(src, pos, out decl_specs);
         if (current == -1)
         {
+            declaration = null;
             return -1;
         }
 
         int saved = current;
-        current = _init_declarator_list.Parse(src, current, out List<InitDeclarator> init_declarators);
+        List<InitDeclr> init_declrs;
+        current = _init_declarator_list.Parse(src, current, out init_declrs);
         if (current == -1)
         {
+            init_declrs = new List<InitDeclr>();
             current = saved;
         }
 
-        if (src[current].type != TokenType.OPERATOR)
+        if (!Parser.EatOperator(src, ref current, OperatorVal.SEMICOLON))
         {
-            return -1;
-        }
-        if (((TokenOperator)(src[current])).val != OperatorValues.SEMICOLON)
-        {
+            declaration = null;
             return -1;
         }
 
-        declaration = new Declaration();
-        declaration.declaration_specifiers = declaration_specifiers;
-        declaration.init_declarators = init_declarators;
-        if (declaration_specifiers.IsTypedef())
+        declaration = new Decln(decl_specs, init_declrs);
+
+        // add parser scope.
+        if (decl_specs.IsTypedef())
         {
-            foreach (InitDeclarator init_declarator in init_declarators)
+            foreach (InitDeclr init_declarator in init_declrs)
             {
                 ScopeEnvironment.AddTypedefName(init_declarator.declarator.name);
             }
         }
 
-        current++;
         return current;
 
     }
 }
 
-public class Declaration : IASTNode
-{
-    public DeclarationSpecifiers declaration_specifiers;
-    public List<InitDeclarator> init_declarators;
-}
 
 
-// declaration_specifiers : storage_class specifier [declaration_specifiers]?
+
+// declaration_specifiers : storage_class_specifier [declaration_specifiers]?
 //                        | type_specifier [declaration_specifiers]?
 //                        | type_qualifier [declaration_specifiers]?
 //
@@ -68,32 +72,54 @@ public class Declaration : IASTNode
 //
 // declaration_specifiers : [ storage_class_specifier | type_specifier | type_qualifier ]+
 //
-public class _declaration_specifiers : IPTNode
+// SEMANT NOTE:
+// 1. after parsing, we need to check that the type specifiers are one of the following sets:
+//     void
+//     char
+//     signed char
+//     unsigned char
+//     short , signed short , short int , or signed short int
+//     unsigned short , or unsigned short int
+//     int , signed , signed int , or no type specifiers
+//     unsigned , or unsigned int
+//     long , signed long , long int , or signed long int
+//     unsigned long , or unsigned long int
+//     float
+//     double
+//     long double
+//     struct-or-union specifier
+//     enum-specifier
+//     typedef-name
+//   note that typing 'int' twice isn't allowed
+// 2. you can only have **one** storage-class specifier
+// 3. you can have many type qualifiers though, because it doesn't cause ambiguity
+//
+public class _declaration_specifiers : ParseRule
 {
     public static bool Test()
     {
+        DeclnSpecs decl_specs;
 
-        var src = Parser.GetTokensFromString("typedef int long const");
-        int current = Parse(src, 0, out DeclarationSpecifiers decl_specs);
+        var src = Parser.GetTokensFromString("typedef int long double const");
+        int current = Parse(src, 0, out decl_specs);
         if (current == -1)
         {
             return false;
         }
+
+        //TType type = DeclnSpecs.GetNonQualifiedType(decl_specs.type_specifiers);
+        //StorageClassSpecifier storage = DeclnSpecs.GetStorageClass(decl_specs.storage_class_specifiers);
 
         src = Parser.GetTokensFromString("typedef typedef typedef const const");
         current = Parse(src, 0, out decl_specs);
-        if (current == -1)
-        {
-            return false;
-        }
-
-        return true;
+        return current != -1;
     }
 
-    public static int Parse(List<Token> src, int begin, out DeclarationSpecifiers decl_specs)
+
+    public static int Parse(List<Token> src, int begin, out DeclnSpecs decl_specs)
     {
         List<StorageClassSpecifier> storage_class_specifiers = new List<StorageClassSpecifier>();
-        List<TypeSpecifier> type_specifiers = new List<TypeSpecifier>();
+        List<TypeSpec> type_specifiers = new List<TypeSpec>();
         List<TypeQualifier> type_qualifiers = new List<TypeQualifier>();
 
         int current = begin;
@@ -102,7 +128,8 @@ public class _declaration_specifiers : IPTNode
             int saved = current;
 
             // 1. match storage_class_specifier
-            current = _storage_class_specifier.Parse(src, current, out StorageClassSpecifier storage_class_specifier);
+            StorageClassSpecifier storage_class_specifier;
+            current = _storage_class_specifier.Parse(src, current, out storage_class_specifier);
             if (current != -1)
             {
                 storage_class_specifiers.Add(storage_class_specifier);
@@ -111,7 +138,8 @@ public class _declaration_specifiers : IPTNode
 
             // 2. if failed, match type_specifier
             current = saved;
-            current = _type_specifier.Parse(src, current, out TypeSpecifier type_specifier);
+            TypeSpec type_specifier;
+            current = _type_specifier.Parse(src, current, out type_specifier);
             if (current != -1)
             {
                 type_specifiers.Add(type_specifier);
@@ -120,7 +148,8 @@ public class _declaration_specifiers : IPTNode
 
             // 3. if failed, match type_qualifier
             current = saved;
-            current = _type_qualifier.Parse(src, current, out TypeQualifier type_qualifier);
+            TypeQualifier type_qualifier;
+            current = _type_qualifier.Parse(src, current, out type_qualifier);
             if (current != -1)
             {
                 type_qualifiers.Add(type_qualifier);
@@ -139,32 +168,12 @@ public class _declaration_specifiers : IPTNode
             return -1;
         }
 
-        decl_specs = new DeclarationSpecifiers(storage_class_specifiers, type_specifiers, type_qualifiers);
+        decl_specs = new DeclnSpecs(storage_class_specifiers, type_specifiers, type_qualifiers);
         return current;
+
     }
+
 }
-
-public class DeclarationSpecifiers : IASTNode
-{
-    public DeclarationSpecifiers(List<StorageClassSpecifier> _storage_class_specifiers,
-                                 List<TypeSpecifier> _type_specifiers,
-                                 List<TypeQualifier> _type_qualifiers)
-    {
-        storage_class_specifiers = _storage_class_specifiers;
-        type_qualifiers = _type_qualifiers;
-        type_specifiers = _type_specifiers;
-    }
-
-    public bool IsTypedef()
-    {
-        return storage_class_specifiers.FindIndex(x => x == StorageClassSpecifier.TYPEDEF) != -1;
-    }
-
-    public List<StorageClassSpecifier> storage_class_specifiers;
-    public List<TypeSpecifier> type_specifiers;
-    public List<TypeQualifier> type_qualifiers;
-}
-
 
 // init_declarator_list : init_declarator
 //                      | init_declarator_list , init_declarator
@@ -173,45 +182,14 @@ public class DeclarationSpecifiers : IASTNode
 //
 // [ return: List<InitDeclarator> ]
 // [ if fail, return empty List<InitDeclarator> ]
-public class _init_declarator_list : IPTNode
+public class _init_declarator_list : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out List<InitDeclarator> init_declarators)
+    public static int Parse(List<Token> src, int begin, out List<InitDeclr> init_declarators)
     {
-        init_declarators = new List<InitDeclarator>();
-
-        int current = _init_declarator.Parse(src, begin, out InitDeclarator init_declarator);
-        if (current == -1)
-        {
-            return -1;
-        }
-
-        if (src[current].type != TokenType.OPERATOR)
-        {
-            init_declarators.Add(init_declarator);
-            return current;
-        }
-
-        if (((TokenOperator)src[current]).val != OperatorValues.COMMA)
-        {
-            init_declarators.Add(init_declarator);
-            return current;
-        }
-
-        current++;
-        int saved = current;
-        current = Parse(src, current, out init_declarators);
-        init_declarators.Insert(0, init_declarator);
-        if (current != -1)
-        {
-            return current;
-        }
-        else
-        {
-            return saved;
-        }
-
+        return Parser.ParseNonEmptyListWithSep(src, begin, out init_declarators, _init_declarator.Parse, OperatorVal.COMMA);
     }
 }
+
 
 // init_declarator : declarator [= initializer]?
 //
@@ -219,32 +197,35 @@ public class _init_declarator_list : IPTNode
 //
 // FAIL: null
 //
-public class _init_declarator : IPTNode
+public class _init_declarator : ParseRule
 {
     public static bool Test()
     {
         var src = Parser.GetTokensFromString("a = 3 + 4");
-        int current = Parse(src, 0, out InitDeclarator decl);
-
-        return current != -1;
+        InitDeclr decl;
+        int current = Parse(src, 0, out decl);
+        if (current == -1)
+        {
+            return false;
+        }
+        return true;
     }
 
     public static int ParseInitializer(List<Token> src, int begin, out Expression init)
     {
-        if (!Parser.IsOperator(src[begin], OperatorValues.ASSIGN))
+        if (!Parser.EatOperator(src, ref begin, OperatorVal.ASSIGN))
         {
             init = null;
             return -1;
         }
-
-        begin++;
         return _initializer.Parse(src, begin, out init);
     }
 
-    public static int Parse(List<Token> src, int begin, out InitDeclarator init_declarator)
+    public static int Parse(List<Token> src, int begin, out InitDeclr init_declarator)
     {
         // step 1. match declarator
-        int current = _declarator.Parse(src, begin, out Declarator declarator);
+        Declr declarator;
+        int current = _declarator.Parse(src, begin, out declarator);
         if (current == -1)
         {
             init_declarator = null;
@@ -253,28 +234,18 @@ public class _init_declarator : IPTNode
 
         // step 2. match initializer
         int saved = current;
-        current = ParseInitializer(src, current, out Expression init);
-        if (current == -1)
+        Expression init;
+        if ((current = ParseInitializer(src, current, out init)) == -1)
         {
             current = saved;
             init = null;
         }
 
-        init_declarator = new InitDeclarator(declarator, init);
+        init_declarator = new InitDeclr(declarator, init);
         return current;
     }
 }
 
-public class InitDeclarator : IASTNode
-{
-    public InitDeclarator(Declarator _decl, Expression _init)
-    {
-        declarator = _decl;
-        init = _init;
-    }
-    public Declarator declarator;
-    public Expression init;
-}
 
 
 // storage_class_specifier : auto | register | static | extern | typedef
@@ -288,12 +259,14 @@ public class InitDeclarator : IASTNode
 // NOTE:
 // there can be only one storage class in one declaration
 //
-public class _storage_class_specifier : IPTNode
+public class _storage_class_specifier : ParseRule
 {
     public static bool Test()
     {
+        StorageClassSpecifier decl_specs;
+
         var src = Parser.GetTokensFromString("typedef");
-        int current = Parse(src, 0, out StorageClassSpecifier decl_specs);
+        int current = Parse(src, 0, out decl_specs);
         if (current == -1)
         {
             return false;
@@ -319,26 +292,26 @@ public class _storage_class_specifier : IPTNode
         }
 
         // check the value
-        var val = ((TokenKeyword)src[begin]).val;
+        KeywordVal val = ((TokenKeyword)src[begin]).val;
         switch (val)
         {
-            case KeywordValues.AUTO:
+            case KeywordVal.AUTO:
                 spec = StorageClassSpecifier.AUTO;
                 return begin + 1;
 
-            case KeywordValues.REGISTER:
+            case KeywordVal.REGISTER:
                 spec = StorageClassSpecifier.REGISTER;
                 return begin + 1;
 
-            case KeywordValues.STATIC:
+            case KeywordVal.STATIC:
                 spec = StorageClassSpecifier.STATIC;
                 return begin + 1;
 
-            case KeywordValues.EXTERN:
+            case KeywordVal.EXTERN:
                 spec = StorageClassSpecifier.EXTERN;
                 return begin + 1;
 
-            case KeywordValues.TYPEDEF:
+            case KeywordVal.TYPEDEF:
                 spec = StorageClassSpecifier.TYPEDEF;
                 return begin + 1;
 
@@ -348,6 +321,14 @@ public class _storage_class_specifier : IPTNode
         }
     }
 }
+/*
+public class StorageClassSpecifier : ASTNode {
+    public StorageClassSpecifier(KeywordVal _content) {
+        content = _content;
+    }
+    public KeywordVal content;
+}
+*/
 
 // type_specifier : void                        /* VoidSpecifier : PrimitiveTypeSpecifier */
 //                | char                        /* CharSpecifier : PrimitiveTypeSpecifier */
@@ -368,11 +349,11 @@ public class _storage_class_specifier : IPTNode
 //
 // NOTE: typedef_name needs environment
 //
-public class _type_specifier : IPTNode
+public class _type_specifier : ParseRule
 {
     public static bool Test()
     {
-        TypeSpecifier spec;
+        TypeSpec spec;
 
         List<String> codes = new List<string> {
             "union { int a; }", "void", "char", "short", "int", "long", "float", "double", "signed", "unsigned",
@@ -402,10 +383,12 @@ public class _type_specifier : IPTNode
         return true;
     }
 
-    public static int Parse(List<Token> src, int begin, out TypeSpecifier spec)
+    public static int Parse(List<Token> src, int begin, out TypeSpec spec)
     {
+
         // 1. match struct or union
-        int current = _struct_or_union_specifier.Parse(src, begin, out StructOrUnionSpecifier struct_or_union_specifier);
+        StructOrUnionSpec struct_or_union_specifier;
+        int current = _struct_or_union_specifier.Parse(src, begin, out struct_or_union_specifier);
         if (current != -1)
         {
             spec = struct_or_union_specifier;
@@ -413,7 +396,8 @@ public class _type_specifier : IPTNode
         }
 
         // 2. match enum
-        current = _enum_specifier.Parse(src, begin, out EnumSpecifier enum_specifier);
+        EnumSpec enum_specifier;
+        current = _enum_specifier.Parse(src, begin, out enum_specifier);
         if (current != -1)
         {
             spec = enum_specifier;
@@ -421,8 +405,9 @@ public class _type_specifier : IPTNode
         }
 
         // 3. match typedef name
-        current = _typedef_name.Parse(src, begin, out string typedef_name);
-        if (current != -1)
+        String typedef_name;
+        current = begin;
+        if (_typedef_name.Parse(src, ref current, out typedef_name))
         {
             spec = new TypedefName(typedef_name);
             return current;
@@ -437,84 +422,51 @@ public class _type_specifier : IPTNode
         }
 
         // check the value
-        var val = ((TokenKeyword)src[begin]).val;
+        KeywordVal val = ((TokenKeyword)src[begin]).val;
         switch (val)
         {
-            case KeywordValues.VOID:
-                spec = new VoidSpecifier();
+            case KeywordVal.VOID:
+                spec = new TypeSpec(BTypeSpec.VOID);
                 return begin + 1;
 
-            case KeywordValues.CHAR:
-                spec = new CharSpecifier();
+            case KeywordVal.CHAR:
+                spec = new TypeSpec(BTypeSpec.CHAR);
                 return begin + 1;
 
-            case KeywordValues.SHORT:
-                spec = new ShortSpecifier();
+            case KeywordVal.SHORT:
+                spec = new TypeSpec(BTypeSpec.SHORT);
                 return begin + 1;
 
-            case KeywordValues.INT:
-                spec = new IntSpecifier();
+            case KeywordVal.INT:
+                spec = new TypeSpec(BTypeSpec.INT);
                 return begin + 1;
 
-            case KeywordValues.LONG:
-                spec = new LongSpecifier();
+            case KeywordVal.LONG:
+                spec = new TypeSpec(BTypeSpec.LONG);
                 return begin + 1;
 
-            case KeywordValues.FLOAT:
-                spec = new FloatSpecifier();
+            case KeywordVal.FLOAT:
+                spec = new TypeSpec(BTypeSpec.FLOAT);
                 return begin + 1;
 
-            case KeywordValues.DOUBLE:
-                spec = new DoubleSpecifier();
+            case KeywordVal.DOUBLE:
+                spec = new TypeSpec(BTypeSpec.DOUBLE);
                 return begin + 1;
 
-            case KeywordValues.SIGNED:
-                spec = new SignedSpecifier();
+            case KeywordVal.SIGNED:
+                spec = new TypeSpec(BTypeSpec.SIGNED);
                 return begin + 1;
 
-            case KeywordValues.UNSIGNED:
-                spec = new UnsignedSpecifier();
+            case KeywordVal.UNSIGNED:
+                spec = new TypeSpec(BTypeSpec.UNSIGNED);
                 return begin + 1;
 
             default:
                 spec = null;
                 return -1;
         }
+
     }
-}
-
-public class TypeSpecifier : IASTNode { }
-
-public class PrimitiveTypeSpecifier : TypeSpecifier { }
-
-public class IntSpecifier : PrimitiveTypeSpecifier { }
-
-public class ShortSpecifier : PrimitiveTypeSpecifier { }
-
-public class LongSpecifier : PrimitiveTypeSpecifier { }
-
-public class FloatSpecifier : PrimitiveTypeSpecifier { }
-
-public class DoubleSpecifier : PrimitiveTypeSpecifier { }
-
-public class CharSpecifier : PrimitiveTypeSpecifier { }
-
-// this is just temporary
-public class SignedSpecifier : PrimitiveTypeSpecifier { }
-
-// this is just temporary
-public class UnsignedSpecifier : PrimitiveTypeSpecifier { }
-
-public class VoidSpecifier : PrimitiveTypeSpecifier { }
-
-// this is just temporary
-public class TypedefName : TypeSpecifier
-{
-    public TypedefName(string _name)
-    {
-        name = _name;
-    }
-    public string name;
 }
 
 // type_qualifier : const | volatile
@@ -525,12 +477,13 @@ public class TypedefName : TypeSpecifier
 //
 // NOTE: there can be multiple type_qualifiers in one declaration
 //
-public class _type_qualifier : IPTNode
+public class _type_qualifier : ParseRule
 {
     public static bool Test()
     {
         var src = Parser.GetTokensFromString("const volatile");
-        int current = Parse(src, 0, out TypeQualifier qualifier);
+        TypeQualifier qualifier;
+        int current = Parse(src, 0, out qualifier);
         if (current == -1)
         {
             return false;
@@ -555,6 +508,7 @@ public class _type_qualifier : IPTNode
 
     public static int Parse(List<Token> src, int begin, out TypeQualifier qualifier)
     {
+
         // make sure te token is a keyword
         if (src[begin].type != TokenType.KEYWORD)
         {
@@ -563,14 +517,14 @@ public class _type_qualifier : IPTNode
         }
 
         // check the value
-        KeywordValues val = ((TokenKeyword)src[begin]).val;
+        KeywordVal val = ((TokenKeyword)src[begin]).val;
         switch (val)
         {
-            case KeywordValues.CONST:
+            case KeywordVal.CONST:
                 qualifier = TypeQualifier.CONST;
                 return begin + 1;
 
-            case KeywordValues.VOLATILE:
+            case KeywordVal.VOLATILE:
                 qualifier = TypeQualifier.VOLATILE;
                 return begin + 1;
 
@@ -582,27 +536,33 @@ public class _type_qualifier : IPTNode
     }
 }
 
+
 // declarator : [pointer]? direct_declarator
 //
 // RETURN: Declarator
 //
 // FAIL: null
 //
-public class _declarator : IPTNode
+public class _declarator : ParseRule
 {
     public static bool Test()
     {
         var src = Parser.GetTokensFromString("* const * const a[3][4]");
-        int current = Parse(src, 0, out Declarator decl);
-
-        return current != -1;
+        Declr decl;
+        int current = Parse(src, 0, out decl);
+        if (current == -1)
+        {
+            return false;
+        }
+        return true;
     }
 
-    public static int Parse(List<Token> src, int begin, out Declarator decl)
+    public static int Parse(List<Token> src, int begin, out Declr decl)
     {
 
         // try to match pointer
-        int current = _pointer.Parse(src, begin, out List<PointerInfo> pointer_infos);
+        List<PointerInfo> pointer_infos;
+        int current = _pointer.Parse(src, begin, out pointer_infos);
         if (current == -1)
         {
             // if fail, just create an empty list
@@ -625,99 +585,82 @@ public class _declarator : IPTNode
     }
 }
 
-public interface ITypeInfo { }
-
-public class FunctionInfo : ITypeInfo
+// pointer : '*' [type_qualifier_list]? [pointer]?
+//
+// RETURN: List<PointerInfo>
+//
+// FAIL: null
+//
+public class _pointer : ParseRule
 {
-    public FunctionInfo(ParameterTypeList _param_type_list)
+    public static bool Test()
     {
-        param_type_list = _param_type_list;
-    }
-    public ParameterTypeList param_type_list;
-}
-
-public class ArrayInfo : ITypeInfo
-{
-    public ArrayInfo(Expression _nelems)
-    {
-        nelems = _nelems;
-    }
-    public Expression nelems;
-}
-
-public class PointerInfo : ITypeInfo
-{
-    public List<TypeQualifier> type_qualifiers;
-}
-
-public class Declarator : IASTNode
-{
-    public Declarator()
-    {
-        type_infos = new List<ITypeInfo>();
-    }
-    public List<ITypeInfo> type_infos;
-    public String name;
-}
-
-
-// pointer : * [type_qualifier_list]? [pointer]?
-// [ note: my solution ]
-// pointer : < * [type_qualifier_list]? >+
-// [ return: List<PointerInfo> ]
-// [ if fail, return empty List<PointerInfo> ]
-public class _pointer : IPTNode
-{
-    public static int Parse(List<Token> src, int begin, out List<PointerInfo> infos)
-    {
-        infos = new List<PointerInfo>();
-        if (src[begin].type != TokenType.OPERATOR)
-        {
-            return -1;
-        }
-        if (((TokenOperator)src[begin]).val != OperatorValues.MULT)
-        {
-            return -1;
-        }
-
-        PointerInfo info = new PointerInfo();
-        int current = _type_qualifier_list.Parse(src, begin + 1, out info.type_qualifiers);
+        var src = Parser.GetTokensFromString("* const * volatile const *");
+        List<PointerInfo> infos;
+        int current = Parse(src, 0, out infos);
         if (current == -1)
         {
-            current = begin + 1;
+            return false;
         }
+        return true;
+    }
 
-        int saved = current;
-        current = Parse(src, current, out infos);
-        infos.Add(info);
-        if (current != -1)
+    public static int Parse(List<Token> src, int begin, out List<PointerInfo> infos)
+    {
+        // match '*'
+        if (!Parser.IsOperator(src[begin], OperatorVal.MULT))
         {
-            return current;
+            infos = null;
+            return -1;
+        }
+        int current = begin + 1;
+
+        // try to match type_qualifier_list, if fail, just create an empty list
+        List<TypeQualifier> type_qualifiers;
+        int saved = current;
+        current = _type_qualifier_list.Parse(src, current, out type_qualifiers);
+        if (current == -1)
+        {
+            current = saved;
+            type_qualifiers = new List<TypeQualifier>();
+        }
+        PointerInfo info = new PointerInfo(type_qualifiers);
+
+        saved = current;
+        current = _pointer.Parse(src, current, out infos);
+        if (current == -1)
+        {
+            infos = new List<PointerInfo>();
+            infos.Add(info);
+            return saved;
         }
         else
         {
-            return saved;
+            infos.Add(info);
+            return current;
         }
     }
 }
+
 
 // parameter_type_list : parameter_list
 //                     | parameter_list , ...
 // [ note: my solution ]
 // parameter_type_list : parameter_list < , ... >?
-public class _parameter_type_list : IPTNode
+public class _parameter_type_list : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out ParameterTypeList param_type_list)
+    public static int Parse(List<Token> src, int begin, out ParamTypeList param_type_list)
     {
         param_type_list = null;
 
-        int current = _parameter_list.Parse(src, begin, out List<ParameterDeclaration> param_list);
+        List<ParamDecln> param_list;
+        int current = _parameter_list.Parse(src, begin, out param_list);
         if (current == -1)
         {
             return -1;
         }
 
-        param_type_list = new ParameterTypeList(param_list);
+        param_type_list = new ParamTypeList(param_list);
 
         if (Parser.IsCOMMA(src[current]))
         {
@@ -739,36 +682,25 @@ public class _parameter_type_list : IPTNode
     }
 }
 
-public class ParameterTypeList : IASTNode
-{
-    public ParameterTypeList(List<ParameterDeclaration> _param_list)
-    {
-        IsVarArgs = false;
-        param_list = _param_list;
-    }
-
-    public bool IsVarArgs;
-    public List<ParameterDeclaration> param_list;
-}
-
 
 // parameter_list : parameter_declaration
 //                | parameter_list, parameter_declaration
 // [ note: my solution ]
 // parameter_list : parameter_declaration < , parameter_declaration >*
 // [ note: it's okay to have a lonely ',', just leave it alone ]
-public class _parameter_list : IPTNode
+public class _parameter_list : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out List<ParameterDeclaration> param_list)
+    public static int Parse(List<Token> src, int begin, out List<ParamDecln> param_list)
     {
-        int current = _parameter_declaration.Parse(src, begin, out ParameterDeclaration decl);
+        ParamDecln decl;
+        int current = _parameter_declaration.Parse(src, begin, out decl);
         if (current == -1)
         {
             param_list = null;
             return -1;
         }
 
-        param_list = new List<ParameterDeclaration>();
+        param_list = new List<ParamDecln>();
         param_list.Add(decl);
 
         int saved;
@@ -797,13 +729,14 @@ public class _parameter_list : IPTNode
 // type_qualifier_list : [type_qualifier]+
 // [ return: List<TypeQualifier> ]
 // [ if fail, return empty List<TypeQualifier> ]
-public class _type_qualifier_list : IPTNode
+public class _type_qualifier_list : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out List<TypeQualifier> type_qualifiers)
     {
         type_qualifiers = new List<TypeQualifier>();
 
-        int current = _type_qualifier.Parse(src, begin, out TypeQualifier type_qualifier);
+        TypeQualifier type_qualifier;
+        int current = _type_qualifier.Parse(src, begin, out type_qualifier);
         if (current == -1)
         {
             return -1;
@@ -820,6 +753,7 @@ public class _type_qualifier_list : IPTNode
         {
             return saved;
         }
+
     }
 }
 
@@ -830,7 +764,17 @@ public class _type_qualifier_list : IPTNode
 //                   | direct_declarator '(' [parameter_type_list]? ')'
 //                   | direct_declarator '(' identifier_list ')'            /* old style, i'm deleting this */
 //
-// function prototypes should always be like this:
+// NOTE: the grammar [ direct_declarator '(' identifier_list ')' ] is for the **old-style** function prototype like this:
+// +-------------------------------+
+// |    int foo(param1, param2)    |
+// |    int param1;                |
+// |    char param2;               |
+// |    {                          |
+// |        ....                   |
+// |    }                          |
+// +-------------------------------+
+//
+// i'm **not** going to support this style. function prototypes should always be like this:
 // +------------------------------------------+
 // |    int foo(int param1, char param2) {    |
 // |        ....                              |
@@ -849,12 +793,13 @@ public class _type_qualifier_list : IPTNode
 //
 // NOTE: this grammar is left-recursive, so i'm changing it to:
 // direct_declarator : [ identifier | '(' declarator ')' ] [ '[' [constant_expression]? ']' | '(' [parameter_type_list]? ')' ]*
-public class _direct_declarator : IPTNode
+public class _direct_declarator : ParseRule
 {
     public static bool Test()
     {
         var src = Parser.GetTokensFromString("(*a)[3][5 + 7][]");
-        int current = Parse(src, 0, out Declarator decl);
+        Declr decl;
+        int current = Parse(src, 0, out decl);
         if (current == -1)
         {
             return false;
@@ -863,9 +808,9 @@ public class _direct_declarator : IPTNode
         return true;
     }
 
-    public static int ParseDeclarator(List<Token> src, int begin, out Declarator decl)
+    public static int ParseDeclarator(List<Token> src, int begin, out Declr decl)
     {
-        if (!Parser.IsOperator(src[begin], OperatorValues.LPAREN))
+        if (!Parser.IsOperator(src[begin], OperatorVal.LPAREN))
         {
             decl = null;
             return -1;
@@ -879,7 +824,7 @@ public class _direct_declarator : IPTNode
             return -1;
         }
 
-        if (!Parser.IsOperator(src[begin], OperatorValues.RPAREN))
+        if (!Parser.IsOperator(src[begin], OperatorVal.RPAREN))
         {
             decl = null;
             return -1;
@@ -892,7 +837,7 @@ public class _direct_declarator : IPTNode
     public static int ParseArrayInfo(List<Token> src, int begin, out ArrayInfo info)
     {
         // match '['
-        if (!Parser.IsOperator(src[begin], OperatorValues.LBRACKET))
+        if (!Parser.IsOperator(src[begin], OperatorVal.LBRACKET))
         {
             info = null;
             return -1;
@@ -900,8 +845,9 @@ public class _direct_declarator : IPTNode
         begin++;
 
         // match constant_expression, if fail, just put null
+        Expression nelems;
         int saved = begin;
-        begin = _constant_expression.Parse(src, begin, out Expression nelems);
+        begin = _constant_expression.Parse(src, begin, out nelems);
         if (begin == -1)
         {
             nelems = null;
@@ -909,7 +855,7 @@ public class _direct_declarator : IPTNode
         }
 
         // match ']'
-        if (!Parser.IsOperator(src[begin], OperatorValues.RBRACKET))
+        if (!Parser.IsOperator(src[begin], OperatorVal.RBRACKET))
         {
             info = null;
             return -1;
@@ -923,7 +869,7 @@ public class _direct_declarator : IPTNode
     public static int ParseFunctionInfo(List<Token> src, int begin, out FunctionInfo info)
     {
         // match '('
-        if (!Parser.IsOperator(src[begin], OperatorValues.LPAREN))
+        if (!Parser.IsOperator(src[begin], OperatorVal.LPAREN))
         {
             info = null;
             return -1;
@@ -931,8 +877,9 @@ public class _direct_declarator : IPTNode
         begin++;
 
         // match constant_expression, if fail, just put null
+        ParamTypeList param_type_list;
         int saved = begin;
-        begin = _parameter_type_list.Parse(src, begin, out ParameterTypeList param_type_list);
+        begin = _parameter_type_list.Parse(src, begin, out param_type_list);
         if (begin == -1)
         {
             param_type_list = null;
@@ -940,7 +887,7 @@ public class _direct_declarator : IPTNode
         }
 
         // match ')'
-        if (!Parser.IsOperator(src[begin], OperatorValues.RPAREN))
+        if (!Parser.IsOperator(src[begin], OperatorVal.RPAREN))
         {
             info = null;
             return -1;
@@ -951,16 +898,18 @@ public class _direct_declarator : IPTNode
         return begin;
     }
 
-    public static int ParseTypeInfo(List<Token> src, int begin, out ITypeInfo info)
+    public static int ParseTypeInfo(List<Token> src, int begin, out TypeInfo info)
     {
-        int current = ParseArrayInfo(src, begin, out ArrayInfo array_info);
+        ArrayInfo array_info;
+        int current = ParseArrayInfo(src, begin, out array_info);
         if (current != -1)
         {
             info = array_info;
             return current;
         }
 
-        current = ParseFunctionInfo(src, begin, out FunctionInfo function_info);
+        FunctionInfo function_info;
+        current = ParseFunctionInfo(src, begin, out function_info);
         if (current != -1)
         {
             info = function_info;
@@ -971,7 +920,7 @@ public class _direct_declarator : IPTNode
         return -1;
     }
 
-    public static int Parse(List<Token> src, int begin, out Declarator decl)
+    public static int Parse(List<Token> src, int begin, out Declr decl)
     {
 
         // 1. match id | '(' declarator ')'
@@ -985,21 +934,20 @@ public class _direct_declarator : IPTNode
                 decl = null;
                 return -1;
             }
-            string name = ((TokenIdentifier)src[begin]).val;
+            String name = ((TokenIdentifier)src[begin]).val;
             current = begin + 1;
 
-            decl = new Declarator
-            {
-                name = name
-            };
+            decl = new Declr(name);
+            //decl.name = name;
         }
 
         // now match infos
         int saved;
         while (true)
         {
+            TypeInfo info;
             saved = current;
-            current = ParseTypeInfo(src, current, out ITypeInfo info);
+            current = ParseTypeInfo(src, current, out info);
             if (current != -1)
             {
                 decl.type_infos.Add(info);
@@ -1010,19 +958,20 @@ public class _direct_declarator : IPTNode
             return current;
         }
     }
+
 }
 
 
 // enum_specifier : enum <identifier>? { enumerator_list }
 //                | enum identifier
-public class _enum_specifier : IPTNode
+public class _enum_specifier : ParseRule
 {
 
     // this parses { enumerator_list }
     private static int ParseEnumList(List<Token> src, int begin, out List<Enumerator> enum_list)
     {
         enum_list = null;
-        if (!Parser.IsLCURL(src[begin]))
+        if (!Parser.IsOperator(src[begin], OperatorVal.LCURL))
         {
             return -1;
         }
@@ -1032,7 +981,7 @@ public class _enum_specifier : IPTNode
         {
             return -1;
         }
-        if (!Parser.IsRCURL(src[current]))
+        if (!Parser.IsOperator(src[begin], OperatorVal.RCURL))
         {
             return -1;
         }
@@ -1040,32 +989,39 @@ public class _enum_specifier : IPTNode
         return current;
     }
 
-    public static int Parse(List<Token> src, int begin, out EnumSpecifier enum_spec)
+    public static int Parse(List<Token> src, int begin, out EnumSpec enum_spec)
     {
-        enum_spec = null;
+
+
         if (src[begin].type != TokenType.KEYWORD)
         {
+            enum_spec = null;
             return -1;
         }
-        if (((TokenKeyword)src[begin]).val != KeywordValues.ENUM)
+        if (((TokenKeyword)src[begin]).val != KeywordVal.ENUM)
         {
+            enum_spec = null;
             return -1;
         }
 
         int current = begin + 1;
         List<Enumerator> enum_list;
-        if (src[current].type == TokenType.IDENTIFIER)
+        String name;
+        if ((name = Parser.GetIdentifierValue(src[current])) != null)
         {
-            enum_spec = new EnumSpecifier(((TokenIdentifier)src[current]).val, null);
             current++;
+
             int saved = current;
-            current = ParseEnumList(src, current, out enum_list);
-            if (current == -1)
+            if ((current = ParseEnumList(src, current, out enum_list)) == -1)
             {
+                enum_spec = new EnumSpec(name, new List<Enumerator>());
                 return saved;
             }
-            enum_spec.enum_list = enum_list;
-            return current;
+            else
+            {
+                enum_spec = new EnumSpec(name, enum_list);
+                return current;
+            }
 
         }
         else
@@ -1073,24 +1029,14 @@ public class _enum_specifier : IPTNode
             current = ParseEnumList(src, current, out enum_list);
             if (current == -1)
             {
+                enum_spec = null;
                 return -1;
             }
-            enum_spec = new EnumSpecifier("", enum_list);
+            enum_spec = new EnumSpec("", enum_list);
             return current;
 
         }
     }
-}
-
-public class EnumSpecifier : TypeSpecifier
-{
-    public EnumSpecifier(String _name, List<Enumerator> _enum_list)
-    {
-        name = _name;
-        enum_list = _enum_list;
-    }
-    public String name;
-    public List<Enumerator> enum_list;
 }
 
 
@@ -1098,12 +1044,13 @@ public class EnumSpecifier : TypeSpecifier
 //                 | enumerator_list, enumerator
 // [ note: my solution ]
 // enumerator_list : enumerator < , enumerator >*
-public class _enumerator_list : IPTNode
+public class _enumerator_list : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out List<Enumerator> enum_list)
     {
+        Enumerator enumerator;
         enum_list = new List<Enumerator>();
-        int current = _enumerator.Parse(src, begin, out Enumerator enumerator);
+        int current = _enumerator.Parse(src, begin, out enumerator);
         if (current == -1)
         {
             return -1;
@@ -1137,7 +1084,7 @@ public class _enumerator_list : IPTNode
 //            | enumeration_constant = constant_expression
 // [ note: my solution ]
 // enumerator : enumeration_constant < = constant_expression >?
-public class _enumerator : IPTNode
+public class _enumerator : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out Enumerator enumerator)
     {
@@ -1150,7 +1097,8 @@ public class _enumerator : IPTNode
         if (Parser.IsAssignment(src[current]))
         {
             current++;
-            current = _constant_expression.Parse(src, current, out Expression init);
+            Expression init;
+            current = _constant_expression.Parse(src, current, out init);
             if (current == -1)
             {
                 return -1;
@@ -1164,20 +1112,8 @@ public class _enumerator : IPTNode
     }
 }
 
-public class Enumerator : IASTNode
-{
-    public Enumerator(string _name, Expression _init)
-    {
-        name = _name;
-        init = _init;
-    }
-    public Expression init;
-    public string name;
-}
-
-
 // enumeration_constant : identifier
-public class _enumeration_constant : IPTNode
+public class _enumeration_constant : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out Enumerator enumerator)
     {
@@ -1195,9 +1131,9 @@ public class _enumeration_constant : IPTNode
 // struct_or_union_specifier : struct_or_union <identifier>? { struct_declaration_list }
 //                           | struct_or_union identifier
 // [ note: need some treatment ]
-public class _struct_or_union_specifier : IPTNode
+public class _struct_or_union_specifier : ParseRule
 {
-    public static int ParseDeclarationList(List<Token> src, int begin, out List<StructDecleration> decl_list)
+    public static int ParseDeclarationList(List<Token> src, int begin, out List<StructDecln> decl_list)
     {
         decl_list = null;
 
@@ -1218,15 +1154,17 @@ public class _struct_or_union_specifier : IPTNode
         }
         current++;
         return current;
+
     }
 
-    public static int Parse(List<Token> src, int begin, out StructOrUnionSpecifier spec)
+    public static int Parse(List<Token> src, int begin, out StructOrUnionSpec spec)
     {
         spec = null;
 
-        List<StructDecleration> decl_list;
+        StructOrUnion struct_or_union;
+        List<StructDecln> decl_list;
 
-        int current = _struct_or_union.Parse(src, begin, out StructOrUnion struct_or_union);
+        int current = _struct_or_union.Parse(src, begin, out struct_or_union);
         if (current == -1)
         {
             return -1;
@@ -1240,11 +1178,11 @@ public class _struct_or_union_specifier : IPTNode
             String name = ((TokenIdentifier)src[current]).val;
             if (struct_or_union.is_union)
             {
-                spec = new UnionSpecifier(name, null);
+                spec = new UnionSpec(name, null);
             }
             else
             {
-                spec = new StructSpecifier(name, null);
+                spec = new StructSpec(name, null);
             }
             current++;
             int saved = current;
@@ -1252,15 +1190,17 @@ public class _struct_or_union_specifier : IPTNode
             current = ParseDeclarationList(src, current, out decl_list);
             if (current != -1)
             {
-                spec.decl_list = decl_list;
+                spec.declns = decl_list;
                 return current;
             }
 
             return current;
+
         }
         else
         {
             // anonymous struct or union
+
             current = ParseDeclarationList(src, current, out decl_list);
             if (current == -1)
             {
@@ -1269,11 +1209,11 @@ public class _struct_or_union_specifier : IPTNode
 
             if (struct_or_union.is_union)
             {
-                spec = new UnionSpecifier("", decl_list);
+                spec = new UnionSpec("", decl_list);
             }
             else
             {
-                spec = new StructSpecifier("", decl_list);
+                spec = new StructSpec("", decl_list);
             }
 
             return current;
@@ -1282,33 +1222,8 @@ public class _struct_or_union_specifier : IPTNode
     }
 }
 
-public class StructOrUnionSpecifier : TypeSpecifier
-{
-    public String name;
-    public List<StructDecleration> decl_list;
-}
-
-public class StructSpecifier : StructOrUnionSpecifier
-{
-    public StructSpecifier(String _name, List<StructDecleration> _decl_list)
-    {
-        name = _name;
-        decl_list = _decl_list;
-    }
-}
-
-public class UnionSpecifier : StructOrUnionSpecifier
-{
-    public UnionSpecifier(String _name, List<StructDecleration> _decl_list)
-    {
-        name = _name;
-        decl_list = _decl_list;
-    }
-}
-
-
 // struct_or_union : struct | union
-public class _struct_or_union : IPTNode
+public class _struct_or_union : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out StructOrUnion struct_or_union)
     {
@@ -1319,10 +1234,10 @@ public class _struct_or_union : IPTNode
         }
         switch (((TokenKeyword)src[begin]).val)
         {
-            case KeywordValues.STRUCT:
+            case KeywordVal.STRUCT:
                 struct_or_union = new StructOrUnion(false);
                 return begin + 1;
-            case KeywordValues.UNION:
+            case KeywordVal.UNION:
                 struct_or_union = new StructOrUnion(true);
                 return begin + 1;
             default:
@@ -1331,61 +1246,34 @@ public class _struct_or_union : IPTNode
     }
 }
 
-public class StructOrUnion : IASTNode
-{
-    public StructOrUnion(bool _is_union)
-    {
-        is_union = _is_union;
-    }
-    public bool is_union;
-}
-
-
 // struct_declaration_list : struct_declaration
 //                         | struct_declaration_list struct_declaration
 // [ note: my solution ]
 // struct_declaration_list : <struct_declaration>+
-public class _struct_declaration_list : IPTNode
+public class _struct_declaration_list : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out List<StructDecleration> decl_list)
+    public static int Parse(List<Token> src, int begin, out List<StructDecln> decl_list)
     {
-        decl_list = new List<StructDecleration>();
-
-        int current = _struct_declaration.Parse(src, begin, out StructDecleration decl);
-        if (current == -1)
-        {
-            return -1;
-        }
-        decl_list.Add(decl);
-
-        int saved;
-        while (true)
-        {
-            saved = current;
-            current = _struct_declaration.Parse(src, current, out decl);
-            if (current == -1)
-            {
-                return saved;
-            }
-            decl_list.Add(decl);
-        }
+        return Parser.ParseNonEmptyList(src, begin, out decl_list, _struct_declaration.Parse);
     }
 }
 
 
 // struct_declaration : specifier_qualifier_list struct_declarator_list ;
-public class _struct_declaration : IPTNode
+public class _struct_declaration : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out StructDecleration decl)
+    public static int Parse(List<Token> src, int begin, out StructDecln decl)
     {
         decl = null;
 
-        int current = _specifier_qualifier_list.Parse(src, begin, out DeclarationSpecifiers specs);
+        DeclnSpecs specs;
+        List<Declr> decl_list;
+        int current = _specifier_qualifier_list.Parse(src, begin, out specs);
         if (current == -1)
         {
             return -1;
         }
-        current = _struct_declarator_list.Parse(src, current, out List<Declarator> decl_list);
+        current = _struct_declarator_list.Parse(src, current, out decl_list);
         if (current == -1)
         {
             return -1;
@@ -1396,20 +1284,9 @@ public class _struct_declaration : IPTNode
         }
 
         current++;
-        decl = new StructDecleration(specs, decl_list);
+        decl = new StructDecln(specs, decl_list);
         return current;
     }
-}
-
-public class StructDecleration : IASTNode
-{
-    public StructDecleration(DeclarationSpecifiers _specs, List<Declarator> _decl_list)
-    {
-        specs = _specs;
-        decl_list = _decl_list;
-    }
-    public DeclarationSpecifiers specs;
-    public List<Declarator> decl_list;
 }
 
 // specifier_qualifier_list : type_specifier [specifier_qualifier_list]?
@@ -1421,12 +1298,14 @@ public class StructDecleration : IASTNode
 //
 // NOTE: this is simply a list
 // specifier_qualifier_list : [ type_specifier | type_qualifier ]+
-public class _specifier_qualifier_list : IPTNode
+//
+public class _specifier_qualifier_list : ParseRule
 {
     public static bool Test()
     {
         var src = Parser.GetTokensFromString("int long const");
-        int current = Parse(src, 0, out DeclarationSpecifiers specs);
+        DeclnSpecs specs;
+        int current = Parse(src, 0, out specs);
         if (current == -1)
         {
             return false;
@@ -1435,36 +1314,36 @@ public class _specifier_qualifier_list : IPTNode
         return true;
     }
 
-    public static int Parse(List<Token> src, int begin, out DeclarationSpecifiers decl_specs)
+    public static int Parse(List<Token> src, int begin, out DeclnSpecs decl_specs)
     {
-        List<TypeSpecifier> type_specifiers = new List<TypeSpecifier>();
+        List<TypeSpec> type_specifiers = new List<TypeSpec>();
         List<TypeQualifier> type_qualifiers = new List<TypeQualifier>();
 
-        int current = begin;
+        //int current = begin;
         while (true)
         {
-            int saved = current;
+            int saved = begin;
 
             // 1. match type_specifier
-            current = saved;
-            current = _type_specifier.Parse(src, current, out TypeSpecifier type_specifier);
-            if (current != -1)
+            begin = saved;
+            TypeSpec type_specifier;
+            if ((begin = _type_specifier.Parse(src, begin, out type_specifier)) != -1)
             {
                 type_specifiers.Add(type_specifier);
                 continue;
             }
 
             // 2. match type_qualifier
-            current = saved;
-            current = _type_qualifier.Parse(src, current, out TypeQualifier type_qualifier);
-            if (current != -1)
+            begin = saved;
+            TypeQualifier type_qualifier;
+            if ((begin = _type_qualifier.Parse(src, begin, out type_qualifier)) != -1)
             {
                 type_qualifiers.Add(type_qualifier);
                 continue;
             }
 
             // 3. if all failed, break out of the loop
-            current = saved;
+            begin = saved;
             break;
 
         }
@@ -1475,9 +1354,11 @@ public class _specifier_qualifier_list : IPTNode
             return -1;
         }
 
-        decl_specs = new DeclarationSpecifiers(null, type_specifiers, type_qualifiers);
-        return current;
+        decl_specs = new DeclnSpecs(null, type_specifiers, type_qualifiers);
+        return begin;
+
     }
+
 }
 
 
@@ -1492,12 +1373,13 @@ public class _specifier_qualifier_list : IPTNode
 //
 // FAIL: null
 //
-public class _struct_declarator_list : IPTNode
+public class _struct_declarator_list : ParseRule
 {
     public static bool Test()
     {
         var src = Parser.GetTokensFromString("*a, *b[3]");
-        int current = Parse(src, 0, out List<Declarator> decl_list);
+        List<Declr> decl_list;
+        int current = Parse(src, 0, out decl_list);
         if (current == -1)
         {
             return false;
@@ -1505,39 +1387,9 @@ public class _struct_declarator_list : IPTNode
         return true;
     }
 
-    public static int Parse(List<Token> src, int begin, out List<Declarator> decl_list)
+    public static int Parse(List<Token> src, int begin, out List<Declr> decl_list)
     {
-
-        // match the first declarator
-        int current = _struct_declarator.Parse(src, begin, out Declarator decl);
-        if (current == -1)
-        {
-            decl_list = null;
-            return -1;
-        }
-        decl_list = new List<Declarator>();
-        decl_list.Add(decl);
-
-        // try to match more
-        int saved;
-        while (true)
-        {
-            if (Parser.IsOperator(src[current], OperatorValues.COMMA))
-            {
-                saved = current;
-                current++;
-                current = _struct_declarator.Parse(src, current, out decl);
-                if (current == -1)
-                {
-                    return saved;
-                }
-                decl_list.Add(decl);
-            }
-            else
-            {
-                return current;
-            }
-        }
+        return Parser.ParseNonEmptyListWithSep(src, begin, out decl_list, _struct_declarator.Parse, OperatorVal.COMMA);
     }
 }
 
@@ -1545,10 +1397,10 @@ public class _struct_declarator_list : IPTNode
 // struct_declarator : declarator
 //                   | type_specifier <declarator>? : constant_expression
 // [ note: the second is for bit-field ]
-// [ note: i'm not supporting bit-field ]
-public class _struct_declarator : IPTNode
+// TODO : [ note: i'm not supporting bit-field ]
+public class _struct_declarator : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out Declarator decl)
+    public static int Parse(List<Token> src, int begin, out Declr decl)
     {
         return _declarator.Parse(src, begin, out decl);
     }
@@ -1562,12 +1414,13 @@ public class _struct_declarator : IPTNode
 //
 // FAIL: null
 //
-public class _parameter_declaration : IPTNode
+public class _parameter_declaration : ParseRule
 {
     public static bool Test()
     {
         var src = Parser.GetTokensFromString("int *a[]");
-        int current = Parse(src, 0, out ParameterDeclaration decl);
+        ParamDecln decl;
+        int current = Parse(src, 0, out decl);
         if (current == -1)
         {
             return false;
@@ -1575,77 +1428,54 @@ public class _parameter_declaration : IPTNode
         return true;
     }
 
-    public static int Parse(List<Token> src, int begin, out ParameterDeclaration decl)
+    public static int Parse(List<Token> src, int begin, out ParamDecln decl)
     {
         // step 1. match declaration_specifiers
-        int current = _declaration_specifiers.Parse(src, begin, out DeclarationSpecifiers specs);
-        if (current == -1)
+        DeclnSpecs specs;
+        if ((begin = _declaration_specifiers.Parse(src, begin, out specs)) == -1)
         {
             decl = null;
             return -1;
         }
 
         // step 2. try to match declarator
-        int saved = current;
-        current = _declarator.Parse(src, current, out Declarator declarator);
-        if (current != -1)
+        int saved = begin;
+        Declr declarator;
+        if ((begin = _declarator.Parse(src, begin, out declarator)) != -1)
         {
-            decl = new ParameterDeclaration(specs, declarator);
-            return current;
+            decl = new ParamDecln(specs, declarator);
+            return begin;
         }
 
         // if fail, step 3. try to match abstract_declarator
-        current = saved;
-        current = _abstract_declarator.Parse(src, current, out AbstractDeclarator abstract_declarator);
-        if (current != -1)
+        begin = saved;
+        //AbstractDeclarator abstract_declarator;
+        if ((begin = _abstract_declarator.Parse(src, begin, out declarator)) != -1)
         {
-            decl = new ParameterDeclaration(specs, abstract_declarator);
-            return current;
+            decl = new ParamDecln(specs, declarator);
+            return begin;
         }
 
         // if fail, never mind, just return specifiers
-        decl = new ParameterDeclaration(specs);
+        decl = new ParamDecln(specs, null);
         return saved;
+
     }
 }
 
-public class ParameterDeclaration : IASTNode
-{
-    public ParameterDeclaration(DeclarationSpecifiers _specs)
-    {
-        specs = _specs;
-        decl = null;
-        abstract_decl = null;
-    }
+// identifier_list : /* old style, i'm deleting this */
 
-    public ParameterDeclaration(DeclarationSpecifiers _specs, Declarator _decl)
-    {
-        specs = _specs;
-        decl = _decl;
-        abstract_decl = null;
-    }
-
-    public ParameterDeclaration(DeclarationSpecifiers _specs, AbstractDeclarator _decl)
-    {
-        specs = _specs;
-        decl = null;
-        abstract_decl = _decl;
-    }
-
-    public DeclarationSpecifiers specs;
-    public Declarator decl;
-    public AbstractDeclarator abstract_decl;
-}
 
 // abstract_declarator : pointer
 //                     | <pointer>? direct_abstract_declarator
 // [ note: this is for anonymous declarator ]
 // [ note: there couldn't be any typename in an abstract_declarator ]
-public class _abstract_declarator : IPTNode
+public class _abstract_declarator : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out AbstractDeclarator decl)
+    public static int Parse(List<Token> src, int begin, out Declr decl)
     {
-        int current = _pointer.Parse(src, begin, out List<PointerInfo> infos);
+        List<PointerInfo> infos;
+        int current = _pointer.Parse(src, begin, out infos);
         if (current == -1)
         {
             return _direct_abstract_declarator.Parse(src, begin, out decl);
@@ -1659,21 +1489,21 @@ public class _abstract_declarator : IPTNode
             return current;
         }
 
-        decl = new AbstractDeclarator();
+        decl = new Declr("");
         decl.type_infos.AddRange(infos);
         return saved;
 
     }
 }
 
-public class AbstractDeclarator : IASTNode
-{
-    public AbstractDeclarator()
-    {
-        type_infos = new List<ITypeInfo>();
-    }
-    public List<ITypeInfo> type_infos;
-}
+/*
+//public class AbstractDeclarator : ASTNode {
+//    public AbstractDeclarator() {
+//        type_infos = new List<TypeInfo>();
+//    }
+//    public List<TypeInfo> type_infos;
+//}
+*/
 
 // direct_abstract_declarator : '(' abstract_declarator ')'
 //                            | [direct_abstract_declarator]? '[' [constant_expression]? ']'
@@ -1686,12 +1516,13 @@ public class AbstractDeclarator : IASTNode
 //
 // FAIL: null
 //
-public class _direct_abstract_declarator : IPTNode
+public class _direct_abstract_declarator : ParseRule
 {
     public static bool Test()
     {
         var src = Parser.GetTokensFromString("(*)[3][5 + 7][]");
-        int current = Parse(src, 0, out AbstractDeclarator decl);
+        Declr decl;
+        int current = Parse(src, 0, out decl);
         if (current == -1)
         {
             return false;
@@ -1700,60 +1531,31 @@ public class _direct_abstract_declarator : IPTNode
         return true;
     }
 
-    private static int ParseInfo(List<Token> src, int begin, out ITypeInfo info)
+    // '(' abstract_declarator ')'
+    public static int ParseAbstractDeclarator(List<Token> src, int begin, out Declr decl)
     {
-        info = null;
-        int current;
-        if (Parser.IsLPAREN(src[begin]))
-        {
-            current = begin + 1;
-            if (Parser.IsRPAREN(src[current]))
-            {
-                info = new FunctionInfo(null);
-                current++;
-                return current;
-            }
-        }
-        if (Parser.IsLBRACKET(src[begin]))
-        {
-            current = begin + 1;
-            if (Parser.IsRBRACKET(src[current]))
-            {
-                info = new ArrayInfo(null);
-                current++;
-                return current;
-            }
-        }
-        return -1;
-    }
-
-    public static int ParseAbstractDeclarator(List<Token> src, int begin, out AbstractDeclarator decl)
-    {
-        if (!Parser.IsOperator(src[begin], OperatorValues.LPAREN))
-        {
-            decl = null;
-            return -1;
-        }
-        begin++;
-
-        begin = _abstract_declarator.Parse(src, begin, out decl);
-        if (begin == -1)
+        if (!Parser.EatOperator(src, ref begin, OperatorVal.LPAREN))
         {
             decl = null;
             return -1;
         }
 
-        if (!Parser.IsOperator(src[begin], OperatorValues.RPAREN))
+        if ((begin = _abstract_declarator.Parse(src, begin, out decl)) == -1)
         {
             decl = null;
             return -1;
         }
-        begin++;
+
+        if (!Parser.EatOperator(src, ref begin, OperatorVal.RPAREN))
+        {
+            decl = null;
+            return -1;
+        }
 
         return begin;
     }
 
-    public static int Parse(List<Token> src, int begin, out AbstractDeclarator decl)
+    public static int Parse(List<Token> src, int begin, out Declr decl)
     {
         // 1. match typeinfo | '(' abstract_declarator ')'
         // 1.1 try '(' abstract_declarator ')'
@@ -1761,14 +1563,15 @@ public class _direct_abstract_declarator : IPTNode
         if (current == -1)
         {
             // if fail, 1.2. try typeinfo
-            current = _direct_declarator.ParseTypeInfo(src, begin, out ITypeInfo info);
+            TypeInfo info;
+            current = _direct_declarator.ParseTypeInfo(src, begin, out info);
             if (current == -1)
             {
                 decl = null;
                 return -1;
             }
 
-            decl = new AbstractDeclarator();
+            decl = new Declr("");
             decl.type_infos.Add(info);
         }
 
@@ -1776,8 +1579,9 @@ public class _direct_abstract_declarator : IPTNode
         int saved;
         while (true)
         {
+            TypeInfo info;
             saved = current;
-            current = _direct_declarator.ParseTypeInfo(src, current, out ITypeInfo info);
+            current = _direct_declarator.ParseTypeInfo(src, current, out info);
             if (current != -1)
             {
                 decl.type_infos.Add(info);
@@ -1789,116 +1593,121 @@ public class _direct_abstract_declarator : IPTNode
         }
 
     }
+
 }
 
-// initializer : assignment_expression
-//             | { initializer_list }
-//             | { initializer_list , }
-public class _initializer : IPTNode
-{
-    public static int Parse(List<Token> src, int begin, out Expression node)
-    {
-        if (!Parser.IsLCURL(src[begin]))
-        {
-            return _assignment_expression.Parse(src, begin, out node);
-        }
 
-        int current = begin + 1;
-        current = _initializer_list.Parse(src, current, out node);
+// initializer : assignment_expression
+//             | '{' initializer_list '}'
+//             | '{' initializer_list ',' '}'
+public class _initializer : ParseRule
+{
+    public static bool Test()
+    {
+        var src = Parser.GetTokensFromString("a = 3");
+        Expression expr;
+        int current = Parse(src, 0, out expr);
         if (current == -1)
         {
-            return -1;
+            return false;
         }
 
-        if (Parser.IsRCURL(src[current]))
+        src = Parser.GetTokensFromString("{ a = 3, b = 4, c = 5 }");
+        current = Parse(src, 0, out expr);
+        if (current == -1)
         {
-            current++;
-            return current;
+            return false;
         }
 
-        if (!Parser.IsCOMMA(src[current]))
+        src = Parser.GetTokensFromString("{ a = 3, b = 4, c = 5, }");
+        current = Parse(src, 0, out expr);
+        if (current == -1)
         {
-            return -1;
+            return false;
         }
 
-        current++;
-        if (!Parser.IsRCURL(src[current]))
-        {
-            return -1;
-        }
+        return true;
+    }
 
-        current++;
-        return current;
+    public static int Parse(List<Token> src, int begin, out Expression expr)
+    {
+        // 1. if not start with '{', we have to match assignment_expression
+        if (!Parser.EatOperator(src, ref begin, OperatorVal.LCURL))
+            return _assignment_expression.Parse(src, begin, out expr);
+
+        // 2. if start with '{', match initializer_list
+        if ((begin = _initializer_list.Parse(src, begin, out expr)) == -1)
+            return -1;
+
+        // 3. try to match '}'
+        if (Parser.EatOperator(src, ref begin, OperatorVal.RCURL))
+            return begin;
+
+        // 4. if fail, try to match ',' '}'
+        if (!Parser.EatOperator(src, ref begin, OperatorVal.COMMA))
+            return -1;
+        if (!Parser.EatOperator(src, ref begin, OperatorVal.RCURL))
+            return -1;
+
+        return begin;
     }
 }
 
 
 // initializer_list : initializer
-//                  | initializer_list , initializer
-// [ note: my solution ]
-// initializer_list : initializer < , initializer >*
-// [ leave single ',' alone ]
-public class _initializer_list : IPTNode
+//                  | initializer_list ',' initializer
+//
+// NOTE: this is a list
+//       leave single ',' alone
+//
+// initializer_list : initializer [ ',' initializer ]*
+//
+public class _initializer_list : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out Expression node)
+    public static bool Test()
     {
-        node = null;
-        List<Expression> exprs = new List<Expression>();
-        int current = _initializer.Parse(src, begin, out Expression expr);
+        var src = Parser.GetTokensFromString("{1, 2}, {2, 3}");
+        Expression init;
+        int current = Parse(src, 0, out init);
         if (current == -1)
         {
+            return false;
+        }
+        return true;
+    }
+
+    public static int Parse(List<Token> src, int begin, out Expression expr)
+    {
+        List<Expression> exprs;
+        if ((begin = Parser.ParseNonEmptyListWithSep(src, begin, out exprs, _initializer.Parse, OperatorVal.COMMA)) == -1)
+        {
+            expr = null;
             return -1;
         }
-        exprs.Add(expr);
-        int saved;
 
-        while (true)
-        {
-            if (Parser.IsCOMMA(src[current]))
-            {
-                saved = current;
-                current++;
-                current = _initializer.Parse(src, current, out expr);
-                if (current == -1)
-                {
-                    node = new InitializerList(exprs);
-                    return saved;
-                }
-                exprs.Add(expr);
-            }
-            else
-            {
-                node = new InitializerList(exprs);
-                return current;
-            }
-        }
-    }
-}
+        expr = new InitrList(exprs);
+        return begin;
 
-public class InitializerList : Expression
-{
-    public InitializerList(List<Expression> _exprs)
-    {
-        exprs = _exprs;
     }
-    public List<Expression> exprs;
 }
 
 
 // type_name : specifier_qualifier_list <abstract_declarator>?
-public class _type_name : IPTNode
+public class _type_name : ParseRule
 {
     public static int Parse(List<Token> src, int begin, out TypeName type_name)
     {
         type_name = null;
-        int current = _specifier_qualifier_list.Parse(src, begin, out DeclarationSpecifiers specs);
+        DeclnSpecs specs;
+        int current = _specifier_qualifier_list.Parse(src, begin, out specs);
         if (current == -1)
         {
             return -1;
         }
 
         int saved = current;
-        current = _abstract_declarator.Parse(src, current, out AbstractDeclarator decl);
+        Declr decl;
+        current = _abstract_declarator.Parse(src, current, out decl);
         if (current == -1)
         {
             type_name = new TypeName(specs, null);
@@ -1909,35 +1718,33 @@ public class _type_name : IPTNode
     }
 }
 
-public class TypeName : IASTNode
-{
-    public TypeName(DeclarationSpecifiers _specs, AbstractDeclarator _decl)
-    {
-        specs = _specs;
-        decl = _decl;
-    }
-    public DeclarationSpecifiers specs;
-    public AbstractDeclarator decl;
-}
-
-
 // typedef_name : identifier
-// [ note: must be something already defined, so this needs environment ]
-public class _typedef_name : IPTNode
+//
+// RETURN: String
+//
+// FAIL: null
+//
+// NOTE: must be something already defined, so this needs environment
+//
+public class _typedef_name : ParseRule
 {
-    public static int Parse(List<Token> src, int begin, out String name)
+    public static bool Parse(List<Token> src, ref int pos, out String name)
     {
-        name = null;
-        if (src[begin].type != TokenType.IDENTIFIER)
+        if (src[pos].type != TokenType.IDENTIFIER)
         {
-            return -1;
-        }
-        if (!ScopeEnvironment.HasTypedefName(((TokenIdentifier)src[begin]).val))
-        {
-            return -1;
+            name = null;
+            return false;
         }
 
-        name = ((TokenIdentifier)src[begin]).val;
-        return begin + 1;
+        if (!ScopeEnvironment.HasTypedefName(((TokenIdentifier)src[pos]).val))
+        {
+            name = null;
+            return false;
+        }
+
+        name = ((TokenIdentifier)src[pos]).val;
+        pos++;
+        return true;
     }
 }
+

@@ -5847,9 +5847,9 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\TA\\Desktop\\Compiler\\Course Project\\C-Compiler\\ParseTests\\ParseTest.csproj",
-      "projectName": "ParseTest",
-      "projectPath": "C:\\Users\\TA\\Desktop\\Compiler\\Course Project\\C-Compiler\\ParseTests\\ParseTest.csproj",
+      "projectUniqueName": "C:\\Users\\TA\\Desktop\\Compiler\\Course Project\\C-Compiler\\ParseTests\\Test.csproj",
+      "projectName": "Test",
+      "projectPath": "C:\\Users\\TA\\Desktop\\Compiler\\Course Project\\C-Compiler\\ParseTests\\Test.csproj",
       "packagesPath": "C:\\Users\\TA\\.nuget\\packages\\",
       "outputPath": "C:\\Users\\TA\\Desktop\\Compiler\\Course Project\\C-Compiler\\ParseTests\\obj\\",
       "projectStyle": "PackageReference",

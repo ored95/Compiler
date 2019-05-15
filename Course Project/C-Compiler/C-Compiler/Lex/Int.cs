@@ -3,7 +3,7 @@
 // int
 // ---
 // there are four types of integers: signed, unsigned, signed long, unsigned long
-public enum IntType
+public enum IntSuffix
 {
     NONE,
     U,
@@ -13,23 +13,26 @@ public enum IntType
 
 public class TokenInt : Token
 {
-    public TokenInt()
+    public TokenInt(Int64 _val, IntSuffix _suffix, String _raw)
+        : base(TokenType.INT)
     {
-        type = TokenType.INT;
-        int_type = IntType.NONE;
+        val = _val;
+        suffix = _suffix;
+        raw = _raw;
     }
-    public override string ToString()
+
+    public override String ToString()
     {
-        string str = type.ToString();
-        switch (int_type)
+        String str = type.ToString();
+        switch (suffix)
         {
-            case IntType.L:
+            case IntSuffix.L:
                 str += "(long)";
                 break;
-            case IntType.U:
+            case IntSuffix.U:
                 str += "(unsigned)";
                 break;
-            case IntType.UL:
+            case IntSuffix.UL:
                 str += "(unsigned long)";
                 break;
             default:
@@ -38,18 +41,14 @@ public class TokenInt : Token
         return str + ": " + val.ToString() + " \"" + raw + "\"";
     }
 
-    public Int64 val;
-    public string raw;
-    public IntType int_type;
+    public readonly Int64 val;
+    public readonly String raw;
+    public readonly IntSuffix suffix;
 }
 
 public class FSAInt : FSA
 {
-    Int64 val;
-    string raw;
-    IntType int_type;
-
-    public enum IntState
+    private enum State
     {
         START,
         END,
@@ -63,241 +62,224 @@ public class FSAInt : FSA
         U,
         UL
     };
-    public IntState state;
+
+    private Int64 val;
+    private String raw;
+    private IntSuffix suffix;
+    private State state;
+
     public FSAInt()
     {
-        state = IntState.START;
+        state = State.START;
         val = 0;
         raw = "";
-        int_type = IntType.NONE;
+        suffix = IntSuffix.NONE;
     }
 
-    public void Reset()
+    public override sealed void Reset()
     {
-        state = IntState.START;
+        state = State.START;
         val = 0;
         raw = "";
-        int_type = IntType.NONE;
+        suffix = IntSuffix.NONE;
     }
 
-    public FSAStatus GetStatus()
+    public override sealed FSAStatus GetStatus()
     {
         switch (state)
         {
-            case IntState.START:
+            case State.START:
                 return FSAStatus.NONE;
-            case IntState.END:
+            case State.END:
                 return FSAStatus.END;
-            case IntState.ERROR:
+            case State.ERROR:
                 return FSAStatus.ERROR;
             default:
                 return FSAStatus.RUN;
         }
     }
 
-
-    public Token RetrieveToken()
+    public override sealed Token RetrieveToken()
     {
-        TokenInt token = new TokenInt();
-        token.type = TokenType.INT;
-        token.int_type = int_type;
-        token.raw = raw.Substring(0, raw.Length - 1);
-        token.val = val;
-        return token;
+        return new TokenInt(val, suffix, raw.Substring(0, raw.Length - 1));
     }
-    public void ReadChar(char ch)
+
+    public override sealed void ReadChar(Char ch)
     {
         raw += ch;
         switch (state)
         {
-            case IntState.ERROR:
-            case IntState.END:
-                state = IntState.ERROR;
+            case State.ERROR:
+            case State.END:
+                state = State.ERROR;
                 break;
-            case IntState.START:
+            case State.START:
                 if (ch == '0')
                 {
-                    state = IntState.Z;
+                    state = State.Z;
                 }
-                else if (char.IsDigit(ch))
+                else if (Char.IsDigit(ch))
                 {
-                    state = IntState.D;
+                    state = State.D;
                     val += ch - '0';
                 }
                 else
                 {
-                    state = IntState.ERROR;
+                    state = State.ERROR;
                 }
                 break;
-            case IntState.Z:
+            case State.Z:
                 if (ch == 'x' || ch == 'X')
                 {
-                    state = IntState.ZX;
+                    state = State.ZX;
                 }
-                else if (ch >= '0' && ch <= '7')
+                else if (Utils.IsOctDigit(ch))
                 {
                     val *= 8;
                     val += ch - '0';
-                    state = IntState.O;
+                    state = State.O;
+                }
+                else if (ch == 'u' || ch == 'U')
+                {
+                    suffix = IntSuffix.U;
+                    state = State.U;
+                }
+                else if (ch == 'l' || ch == 'L')
+                {
+                    suffix = IntSuffix.L;
+                    state = State.L;
                 }
                 else
                 {
-                    state = IntState.END;
+                    state = State.END;
                 }
                 break;
-            case IntState.D:
-                if (char.IsDigit(ch))
+            case State.D:
+                if (Char.IsDigit(ch))
                 {
                     val *= 10;
                     val += ch - '0';
-                    state = IntState.D;
+                    state = State.D;
                 }
                 else if (ch == 'u' || ch == 'U')
                 {
-                    int_type = IntType.U;
-                    state = IntState.U;
+                    suffix = IntSuffix.U;
+                    state = State.U;
                 }
                 else if (ch == 'l' || ch == 'L')
                 {
-                    int_type = IntType.L;
-                    state = IntState.L;
+                    suffix = IntSuffix.L;
+                    state = State.L;
                 }
                 else
                 {
-                    state = IntState.END;
+                    state = State.END;
                 }
                 break;
-            case IntState.ZX:
-                if ((ch >= '0' && ch <= '9')
-                    || (ch >= 'a' && ch <= 'f')
-                    || (ch >= 'A' && ch <= 'F'))
+            case State.ZX:
+                if (Utils.IsHexDigit(ch))
                 {
-                    val *= 16;
-                    if (ch >= '0' && ch <= '9')
-                    {
-                        val += ch - '0';
-                    }
-                    else if (ch >= 'a' && ch <= 'f')
-                    {
-                        val += ch - 'a' + 0xA;
-                    }
-                    else if (ch >= 'A' && ch <= 'F')
-                    {
-                        val += ch - 'A' + 0xA;
-                    }
-                    state = IntState.H;
+                    val *= 0x10;
+                    val += Utils.GetHexDigit(ch);
+                    state = State.H;
                 }
                 else
                 {
-                    state = IntState.ERROR;
+                    state = State.ERROR;
                 }
                 break;
-            case IntState.O:
-                if (ch >= '0' && ch <= '7')
+            case State.O:
+                if (Utils.IsOctDigit(ch))
                 {
                     val *= 8;
                     val += ch - '0';
-                    state = IntState.O;
+                    state = State.O;
                 }
                 else if (ch == 'u' || ch == 'U')
                 {
-                    int_type = IntType.U;
-                    state = IntState.U;
+                    suffix = IntSuffix.U;
+                    state = State.U;
                 }
                 else if (ch == 'l' || ch == 'L')
                 {
-                    int_type = IntType.L;
-                    state = IntState.L;
+                    suffix = IntSuffix.L;
+                    state = State.L;
                 }
                 else
                 {
-                    state = IntState.END;
+                    state = State.END;
                 }
                 break;
-            case IntState.L:
+            case State.L:
                 if (ch == 'u' || ch == 'U')
                 {
-                    int_type = IntType.UL;
-                    state = IntState.UL;
+                    suffix = IntSuffix.UL;
+                    state = State.UL;
                 }
                 else
                 {
-                    state = IntState.END;
+                    state = State.END;
                 }
                 break;
-            case IntState.H:
-                if ((ch >= '0' && ch <= '9')
-                    || (ch >= 'a' && ch <= 'f')
-                    || (ch >= 'A' && ch <= 'F'))
+            case State.H:
+                if (Utils.IsHexDigit(ch))
                 {
-                    val *= 16;
-                    if (ch >= '0' && ch <= '9')
-                    {
-                        val += ch - '0';
-                    }
-                    else if (ch >= 'a' && ch <= 'f')
-                    {
-                        val += ch - 'a' + 0xA;
-                    }
-                    else if (ch >= 'A' && ch <= 'F')
-                    {
-                        val += ch - 'A' + 0xA;
-                    }
-                    state = IntState.H;
+                    val *= 0x10;
+                    val += Utils.GetHexDigit(ch);
+                    state = State.H;
                 }
                 else if (ch == 'u' || ch == 'U')
                 {
-                    int_type = IntType.U;
-                    state = IntState.U;
+                    suffix = IntSuffix.U;
+                    state = State.U;
                 }
                 else if (ch == 'l' || ch == 'L')
                 {
-                    int_type = IntType.L;
-                    state = IntState.L;
+                    suffix = IntSuffix.L;
+                    state = State.L;
                 }
                 else
                 {
-                    state = IntState.END;
+                    state = State.END;
                 }
                 break;
-            case IntState.U:
+            case State.U:
                 if (ch == 'l' || ch == 'L')
                 {
-                    int_type = IntType.UL;
-                    state = IntState.UL;
+                    suffix = IntSuffix.UL;
+                    state = State.UL;
                 }
                 else
                 {
-                    state = IntState.END;
+                    state = State.END;
                 }
                 break;
-            case IntState.UL:
-                state = IntState.END;
+            case State.UL:
+                state = State.END;
                 break;
             default:
-                state = IntState.ERROR;
+                state = State.ERROR;
                 break;
         }
     }
 
-    public void ReadEOF()
+    public override sealed void ReadEOF()
     {
         switch (state)
         {
-            case IntState.D:
-            case IntState.Z:
-            case IntState.O:
-            case IntState.L:
-            case IntState.H:
-            case IntState.U:
-            case IntState.UL:
-                state = IntState.END;
+            case State.D:
+            case State.Z:
+            case State.O:
+            case State.L:
+            case State.H:
+            case State.U:
+            case State.UL:
+                state = State.END;
                 break;
             default:
-                state = IntState.ERROR;
+                state = State.ERROR;
                 break;
         }
     }
-
 
 }
