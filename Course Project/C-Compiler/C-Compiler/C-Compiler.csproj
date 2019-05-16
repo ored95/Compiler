@@ -36,51 +36,97 @@
     <Reference Include="System.Collections.Immutable, Version=1.2.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Collections.Immutable.1.5.0\lib\netstandard2.0\System.Collections.Immutable.dll</HintPath>
     </Reference>
-    <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Lex\Char.cs" />
-    <Compile Include="Lex\Float.cs" />
-    <Compile Include="Lex\FSA.cs" />
-    <Compile Include="Lex\Identifier.cs" />
-    <Compile Include="Lex\Int.cs" />
-    <Compile Include="Lex\Keyword.cs" />
-    <Compile Include="Lex\KeywordValues.cs" />
-    <Compile Include="Lex\Operator.cs" />
-    <Compile Include="Lex\OperatorValues.cs" />
-    <Compile Include="Lex\StrTable.cs" />
-    <Compile Include="Lex\Utils.cs" />
-    <Compile Include="Parse\Declarations.cs" />
-    <Compile Include="Parse\Expressions.cs" />
-    <Compile Include="Parse\ExternalDefinitions.cs" />
-    <Compile Include="Parse\Parser.cs" />
-    <Compile Include="Parse\Statements.cs" />
+    <Compile Include="ABT\BinaryOperators.cs" />
+    <Compile Include="ABT\ConstExpressions.cs" />
+    <Compile Include="ABT\Declarations.cs" />
+    <Compile Include="ABT\Environment.cs" />
+    <Compile Include="ABT\Expressions.cs" />
+    <Compile Include="ABT\ExternalDefinitions.cs" />
+    <Compile Include="ABT\Types\TypePrinter.cs" />
+    <Compile Include="ABT\Types\Types.cs" />
+    <Compile Include="AST\AssignmentOperators.cs" />
+    <Compile Include="AST\BinaryOperators.cs" />
+    <Compile Include="AST\ConstExpressions.cs" />
+    <Compile Include="AST\Declarations.cs" />
+    <Compile Include="AST\DeclarationSpecifiers.cs" />
+    <Compile Include="AST\Declarators.cs" />
+    <Compile Include="AST\Expressions.cs" />
+    <Compile Include="AST\ExternalDeclarations.cs" />
+    <Compile Include="AST\SemantUtils.cs" />
+    <Compile Include="AST\Statements.cs" />
+    <Compile Include="AST\UnaryOperators.cs" />
+    <Compile Include="CodeGen\BinaryOperators.cs" />
+    <Compile Include="CodeGen\CGen.cs" />
+    <Compile Include="CodeGen\ConstExpressions.cs" />
+    <Compile Include="CodeGen\Expressions.cs" />
+    <Compile Include="CodeGen\Statements.cs" />
+    <Compile Include="CodeGen\TypeCast.cs" />
+    <Compile Include="CodeGen\UnaryOperators.cs" />
+    <Compile Include="Driver\Compiler.cs" />
+    <Compile Include="Driver\CovariantTuple.cs" />
+    <Compile Include="Driver\HList.cs" />
+    <Compile Include="Driver\Option.cs" />
+    <Compile Include="Parser\CParsers.cs" />
+    <Compile Include="Parser\Declaration.cs" />
+    <Compile Include="Parser\Expressions.cs" />
+    <Compile Include="Parser\ExternalDefinitions.cs" />
+    <Compile Include="Parser\ParserClasses.cs" />
+    <Compile Include="Parser\ParserCombinator.cs" />
+    <Compile Include="Parser\ParserUtils.cs" />
+    <Compile Include="Parser\Statements.cs" />
+    <Compile Include="Parser\Tokens.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Driver\SetOnce.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Lex\String.cs" />
-    <Compile Include="Lex\Tokens.cs" />
-    <Compile Include="SemanticAnalysis\Declarations.cs" />
-    <Compile Include="SemanticAnalysis\Environments.cs" />
-    <Compile Include="SemanticAnalysis\Error.cs" />
-    <Compile Include="SemanticAnalysis\Expressions.cs" />
-    <Compile Include="SemanticAnalysis\ExternalDefinitions.cs" />
-    <Compile Include="SemanticAnalysis\Statements.cs" />
-    <Compile Include="Semantic\Declarations.cs" />
-    <Compile Include="Semantic\Environment.cs" />
-    <Compile Include="Semantic\Expressions.cs" />
-    <Compile Include="Semantic\ExternalDefinitions.cs" />
-    <Compile Include="Semantic\Statements.cs" />
-    <Compile Include="Semantic\Typecast.cs" />
-    <Compile Include="Semantic\Types.cs" />
-    <Compile Include="Semantic\Utils.cs" />
+    <Compile Include="ABT\Statements.cs" />
+    <Compile Include="ABT\StmtVisitor.cs" />
+    <Compile Include="ABT\TypeCast.cs" />
+    <Compile Include="ABT\UnaryOperators.cs" />
+    <Compile Include="ABT\Utils.cs" />
+    <Compile Include="Scanner\Char.cs" />
+    <Compile Include="Scanner\Float.cs" />
+    <Compile Include="Scanner\FSA.cs" />
+    <Compile Include="Scanner\Identifier.cs" />
+    <Compile Include="Scanner\Int.cs" />
+    <Compile Include="Scanner\Keyword.cs" />
+    <Compile Include="Scanner\Operator.cs" />
+    <Compile Include="Scanner\Scanner.cs" />
+    <Compile Include="Scanner\String.cs" />
+    <Compile Include="Scanner\Tokens.cs" />
+    <Compile Include="Scanner\Utils.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
+    <None Include="Scanner\FSAGraphs\char.dot" />
+    <None Include="Scanner\FSAGraphs\constchar.dot" />
+    <None Include="Scanner\FSAGraphs\float.dot" />
+    <None Include="Scanner\FSAGraphs\FSAGraphGenerator.py" />
+    <None Include="Scanner\FSAGraphs\identifier.dot" />
+    <None Include="Scanner\FSAGraphs\int.dot" />
+    <None Include="Scanner\FSAGraphs\newline.dot" />
+    <None Include="Scanner\FSAGraphs\operator.dot" />
+    <None Include="Scanner\FSAGraphs\space.dot" />
+    <None Include="Scanner\FSAGraphs\string.dot" />
+    <None Include="Tests\clean_all.py" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Test\main.c" />
+    <Folder Include="TestResults\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Tests\ExternFunction.c" />
+    <Content Include="Tests\FloatCalculation.c" />
+    <Content Include="Tests\FunctionPointer.c" />
+    <Content Include="Tests\Goto.c" />
+    <Content Include="Tests\IfElseStmt.c" />
+    <Content Include="Tests\LinkedList.c" />
+    <Content Include="Tests\main.c" />
+    <Content Include="Tests\StaticFunction.c" />
+    <Content Include="Tests\StaticObject.c" />
+    <Content Include="Tests\StructReturn.c" />
+    <Content Include="Tests\SwitchStmt.c" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

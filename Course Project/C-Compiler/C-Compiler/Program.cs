@@ -1,20 +1,26 @@
+﻿using Driver;
 using System;
+using System.IO;
+using System.Linq;
 
 namespace C_Compiler
 {
     class Program
     {
-        public static void Main(string[] args)
+        static void Main(String[] args)
         {
-            var LA = new Scanner();
-            LA.OpenFile(@"../../Test/main.c");
+            var files = Directory
+                .GetFiles("../../Tests")
+                .Where(_ => _.EndsWith(".c"));
 
-            LA.Lex();
+            Compiler compiler;
+            foreach (var file in files)
+            {
+                compiler = Compiler.FromFile(file);
+                compiler.SaveAssembly("../../TestResults/" + Path.GetFileNameWithoutExtension(file) + ".s");
+            }
 
-            int current = _translation_unit.Parse(LA.tokens, 0, out TranslationUnit root);
-
-            //Console.Write(root.ToString());
-            Console.ReadLine();
+            compiler = null;
         }
     }
 }
