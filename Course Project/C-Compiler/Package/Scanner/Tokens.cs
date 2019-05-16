@@ -1,212 +1,201 @@
 ﻿using System;
 
-public enum TokenType
+namespace LexicalAnalysis
 {
-    NONE,
-    FLOAT,
-    INT,
-    CHAR,
-    STRING,
-    IDENTIFIER,
-    KEYWORD,
-    OPERATOR
-}
-
-public class Token
-{
-    public Token(TokenType _type)
+    public enum TokenKind
     {
-        type = _type;
+        NONE,
+        FLOAT,
+        INT,
+        CHAR,
+        STRING,
+        IDENTIFIER,
+        KEYWORD,
+        OPERATOR
     }
 
-    public override String ToString()
+    public abstract class Token
     {
-        return type.ToString();
-    }
-    public readonly TokenType type;
-}
-
-public class EmptyToken : Token
-{
-    public EmptyToken()
-        : base(TokenType.NONE) { }
-}
-
-
-
-public class FSASpace : FSA
-{
-    private enum State
-    {
-        START,
-        END,
-        ERROR,
-        SPACE
-    };
-
-    private State state;
-
-    public FSASpace()
-    {
-        state = State.START;
-    }
-
-    public override sealed void Reset()
-    {
-        state = State.START;
-    }
-
-    public override sealed FSAStatus GetStatus()
-    {
-        if (state == State.START)
+        public override String ToString()
         {
-            return FSAStatus.NONE;
+            return this.Kind.ToString();
         }
-        else if (state == State.END)
+        public abstract TokenKind Kind { get; }
+    }
+
+    public sealed class EmptyToken : Token
+    {
+        public override TokenKind Kind { get; } = TokenKind.NONE;
+    }
+
+    public sealed class FSASpace : FSA
+    {
+        private enum State
         {
-            return FSAStatus.END;
+            START,
+            END,
+            ERROR,
+            SPACE
+        };
+
+        private State _state;
+
+        public FSASpace()
+        {
+            this._state = State.START;
         }
-        else if (state == State.ERROR)
+
+        public override void Reset()
         {
-            return FSAStatus.ERROR;
+            this._state = State.START;
         }
-        else
+
+        public override FSAStatus GetStatus()
         {
+            if (this._state == State.START)
+            {
+                return FSAStatus.NONE;
+            }
+            if (this._state == State.END)
+            {
+                return FSAStatus.END;
+            }
+            if (this._state == State.ERROR)
+            {
+                return FSAStatus.ERROR;
+            }
             return FSAStatus.RUNNING;
         }
-    }
 
-    public override sealed Token RetrieveToken()
-    {
-        return new EmptyToken();
-    }
-
-    public override sealed void ReadChar(Char ch)
-    {
-        switch (state)
+        public override Token RetrieveToken()
         {
-            case State.END:
-            case State.ERROR:
-                state = State.ERROR;
-                break;
-            case State.START:
-                if (Utils.IsSpace(ch))
-                {
-                    state = State.SPACE;
-                }
-                else
-                {
-                    state = State.ERROR;
-                }
-                break;
-            case State.SPACE:
-                if (Utils.IsSpace(ch))
-                {
-                    state = State.SPACE;
-                }
-                else
-                {
-                    state = State.END;
-                }
-                break;
+            return new EmptyToken();
+        }
+
+        public override void ReadChar(Char ch)
+        {
+            switch (this._state)
+            {
+                case State.END:
+                case State.ERROR:
+                    this._state = State.ERROR;
+                    break;
+                case State.START:
+                    if (Utils.IsSpace(ch))
+                    {
+                        this._state = State.SPACE;
+                    }
+                    else
+                    {
+                        this._state = State.ERROR;
+                    }
+                    break;
+                case State.SPACE:
+                    if (Utils.IsSpace(ch))
+                    {
+                        this._state = State.SPACE;
+                    }
+                    else
+                    {
+                        this._state = State.END;
+                    }
+                    break;
+            }
+        }
+
+        public override void ReadEOF()
+        {
+            switch (this._state)
+            {
+                case State.SPACE:
+                    this._state = State.END;
+                    break;
+                default:
+                    this._state = State.ERROR;
+                    break;
+            }
         }
     }
 
-    public override sealed void ReadEOF()
+    public sealed class FSANewLine : FSA
     {
-        switch (state)
+        private enum State
         {
-            case State.SPACE:
-                state = State.END;
-                break;
-            default:
-                state = State.ERROR;
-                break;
+            START,
+            END,
+            ERROR,
+            NEWLINE
+        };
+
+        private State _state;
+
+        public FSANewLine()
+        {
+            this._state = State.START;
         }
-    }
-}
 
-public class FSANewLine : FSA
-{
-    private enum NewLineState
-    {
-        START,
-        END,
-        ERROR,
-        NEWLINE
-    };
-
-    private NewLineState state;
-
-    public FSANewLine()
-    {
-        state = NewLineState.START;
-    }
-
-    public override sealed void Reset()
-    {
-        state = NewLineState.START;
-    }
-
-    public override sealed FSAStatus GetStatus()
-    {
-        if (state == NewLineState.START)
+        public override void Reset()
         {
-            return FSAStatus.NONE;
+            this._state = State.START;
         }
-        else if (state == NewLineState.END)
+
+        public override FSAStatus GetStatus()
         {
-            return FSAStatus.END;
-        }
-        else if (state == NewLineState.ERROR)
-        {
-            return FSAStatus.ERROR;
-        }
-        else
-        {
+            if (this._state == State.START)
+            {
+                return FSAStatus.NONE;
+            }
+            if (this._state == State.END)
+            {
+                return FSAStatus.END;
+            }
+            if (this._state == State.ERROR)
+            {
+                return FSAStatus.ERROR;
+            }
             return FSAStatus.RUNNING;
         }
-    }
 
-    public override sealed Token RetrieveToken()
-    {
-        return new EmptyToken();
-    }
-
-    public override sealed void ReadChar(Char ch)
-    {
-        switch (state)
+        public override Token RetrieveToken()
         {
-            case NewLineState.END:
-            case NewLineState.ERROR:
-                state = NewLineState.ERROR;
-                break;
-            case NewLineState.START:
-                if (ch == '\n')
-                {
-                    state = NewLineState.NEWLINE;
-                }
-                else
-                {
-                    state = NewLineState.ERROR;
-                }
-                break;
-            case NewLineState.NEWLINE:
-                state = NewLineState.END;
-                break;
+            return new EmptyToken();
         }
-    }
 
-    public override sealed void ReadEOF()
-    {
-        switch (state)
+        public override void ReadChar(Char ch)
         {
-            case NewLineState.NEWLINE:
-                state = NewLineState.END;
-                break;
-            default:
-                state = NewLineState.ERROR;
-                break;
+            switch (this._state)
+            {
+                case State.END:
+                case State.ERROR:
+                    this._state = State.ERROR;
+                    break;
+                case State.START:
+                    if (ch == '\n')
+                    {
+                        this._state = State.NEWLINE;
+                    }
+                    else
+                    {
+                        this._state = State.ERROR;
+                    }
+                    break;
+                case State.NEWLINE:
+                    this._state = State.END;
+                    break;
+            }
+        }
+
+        public override void ReadEOF()
+        {
+            switch (this._state)
+            {
+                case State.NEWLINE:
+                    this._state = State.END;
+                    break;
+                default:
+                    this._state = State.ERROR;
+                    break;
+            }
         }
     }
 }

@@ -1,114 +1,97 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using AST;
+using static SyntaxTree.SemanticAnalysis;
 
 namespace SyntaxTree
 {
-    public class TranslationUnit : PTNode
+    public interface ISyntaxTreeNode { }
+
+    /// <summary>
+    /// A translation unit consists of a list of external declarations - functions and objects.
+    /// </summary>
+    public sealed class TranslnUnit : ISyntaxTreeNode
     {
-        public TranslationUnit(List<ExternalDeclaration> _declns)
+        private TranslnUnit(ImmutableList<IExternDecln> declns)
         {
-            unit_declns = _declns;
+            this.Declns = declns;
         }
 
-        public Tuple<AST.Env, AST.TranslnUnit> GetTranslationUnit()
+        public static TranslnUnit Create(ImmutableList<IExternDecln> externDeclns) =>
+            new TranslnUnit(externDeclns);
+
+        [SemantMethod]
+        public ISemantReturn<AST.TranslnUnit> GetTranslnUnit()
         {
-            List<Tuple<AST.Env, AST.ExternDecln>> declns = new List<Tuple<AST.Env, AST.ExternDecln>>();
-            AST.Env env = new AST.Env();
-
-            foreach (ExternalDeclaration decln in unit_declns)
-            {
-                Tuple<AST.Env, List<Tuple<AST.Env, AST.ExternDecln>>> r_decln = decln.GetExternDecln(env);
-                env = r_decln.Item1;
-                declns.AddRange(r_decln.Item2);
-            }
-
-            return new Tuple<AST.Env, AST.TranslnUnit>(env, new AST.TranslnUnit(declns));
-        }
-
-        public List<ExternalDeclaration> unit_declns;
-    }
-
-
-    public abstract class ExternalDeclaration : PTNode
-    {
-        public abstract Tuple<AST.Env, List<Tuple<AST.Env, AST.ExternDecln>>> GetExternDecln(AST.Env env);
-    }
-
-    // Function Definition
-    // ===================
-    // 
-    public class FunctionDefinition : ExternalDeclaration
-    {
-        public FunctionDefinition(DeclnSpecs _specs, Declr _decl, CompoundStatement _stmt)
-        {
-            func_specs = _specs;
-            func_declr = _decl;
-            func_stmt = _stmt;
-        }
-
-        public readonly DeclnSpecs func_specs;
-        public readonly Declr func_declr;
-        public readonly CompoundStatement func_stmt;
-
-        // Get Function Definition
-        // =======================
-        // 
-        public Tuple<AST.Env, AST.FuncDef> GetFuncDef(AST.Env env)
-        {
-            Tuple<AST.Env, AST.Decln.SCS, AST.ExprType> r_specs = func_specs.GetSCSType(env);
-            env = r_specs.Item1;
-            AST.Decln.SCS scs = r_specs.Item2;
-            AST.ExprType base_type = r_specs.Item3;
-
-            Tuple<String, AST.ExprType> r_declr = func_declr.GetNameAndType(env, base_type);
-            String name = r_declr.Item1;
-            AST.ExprType type = r_declr.Item2;
-
-            AST.TFunction func_type;
-            if (type.kind == AST.ExprType.Kind.FUNCTION)
-            {
-                func_type = (AST.TFunction)type;
-            }
-            else
-            {
-                Log.SemantError("Error: not a function");
-                return null;
-            }
-
-            switch (scs)
-            {
-                case AST.Decln.SCS.AUTO:
-                case AST.Decln.SCS.EXTERN:
-                case AST.Decln.SCS.STATIC:
-                    env = env.PushEntry(AST.Env.EntryKind.GLOBAL, name, type);
-                    break;
-                default:
-                    Log.SemantError("Error: invalid storage class specifier for function definition.");
-                    return null;
-            }
-
-            env = env.SetCurrentFunction(func_type);
-
-            Tuple<AST.Env, AST.Stmt> r_stmt = func_stmt.GetStmt(env);
-            env = r_stmt.Item1;
-            AST.Stmt stmt = r_stmt.Item2;
-
-            env = env.SetCurrentFunction(new AST.TEmptyFunction());
-
-            return new Tuple<AST.Env, AST.FuncDef>(env, new AST.FuncDef(name, scs, func_type, stmt));
-
-        }
-
-        public override Tuple<AST.Env, List<Tuple<AST.Env, AST.ExternDecln>>> GetExternDecln(AST.Env env)
-        {
-            Tuple<AST.Env, AST.FuncDef> r_def = GetFuncDef(env);
-            return new Tuple<AST.Env, List<Tuple<AST.Env, AST.ExternDecln>>>(
-                r_def.Item1,
-                new List<Tuple<AST.Env, AST.ExternDecln>>() {
-                new Tuple<AST.Env, AST.ExternDecln>(r_def.Item1, r_def.Item2)
-                }
+            var env = new Env();
+            var externDeclns = this.Declns.Aggregate(ImmutableList<Tuple<Env, ExternDecln>>.Empty, (acc, externDecln) => acc.AddRange(Semant(externDecln.GetExternDecln, ref env))
             );
+            return SemantReturn.Create(env, new AST.TranslnUnit(externDeclns.ToList()));
         }
 
+        public ImmutableList<IExternDecln> Declns { get; }
     }
+
+
+    public interface IExternDecln : ISyntaxTreeNode
+    {
+        [SemantMethod]
+        ISemantReturn<ImmutableList<Tuple<Env, ExternDecln>>> GetExternDecln(Env env);
+    }
+
+    /// <summary>
+    /// A function definition gives the implementation.
+    /// </summary>
+    public sealed class FuncDef : IExternDecln
+    {
+        public FuncDef(DeclnSpecs specs, Declr declr, CompoundStmt stmt)
+        {
+            this.Specs = specs;
+            this.Declr = declr;
+            this.Stmt = stmt;
+        }
+
+        public static FuncDef Create(Option<DeclnSpecs> declnSpecs, Declr declr, Stmt body) =>
+            new FuncDef(declnSpecs.IsSome ? declnSpecs.Value : DeclnSpecs.Empty, declr, body as CompoundStmt);
+
+        public DeclnSpecs Specs { get; }
+        public Declr Declr { get; }
+        public CompoundStmt Stmt { get; }
+
+        [SemantMethod]
+        public ISemantReturn<ImmutableList<Tuple<Env, ExternDecln>>> GetExternDecln(Env env)
+        {
+            var storageClass = this.Specs.GetStorageClass();
+            var baseType = Semant(this.Specs.GetExprType, ref env);
+            var name = this.Declr.Name;
+            var type = Semant(this.Declr.DecorateType, baseType, ref env);
+
+            var funcType = type as TFunction;
+            if (funcType == null)
+            {
+                throw new InvalidOperationException("Expected a function type.");
+            }
+
+            switch (storageClass)
+            {
+                case StorageClass.AUTO:
+                case StorageClass.EXTERN:
+                case StorageClass.STATIC:
+                    env = env.PushEntry(Env.EntryKind.GLOBAL, name, type);
+                    break;
+                case StorageClass.TYPEDEF:
+                default:
+                    throw new InvalidOperationException("Invalid storage class specifier for function definition.");
+            }
+
+            env = env.InScope();
+            env = env.SetCurrentFunction(funcType);
+            var stmt = SemantStmt(this.Stmt.GetStmt, ref env);
+            env = env.OutScope();
+
+            return SemantReturn.Create(env, ImmutableList.Create(Tuple.Create(env, new AST.FuncDef(name, storageClass, funcType, stmt) as ExternDecln)));
+        }
+    }
+
 }

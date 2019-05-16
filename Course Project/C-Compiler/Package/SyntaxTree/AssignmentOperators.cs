@@ -1,30 +1,33 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace SyntaxTree
+﻿namespace SyntaxTree
 {
+    using static SemanticAnalysis;
+
     /// <summary>
-    /// Assignment: lhs = rhs
+    /// Assignment: Left = Right
     /// </summary>
     /// <remarks>
-    /// lhs must be a lvalue, but this check is left to the cgen phase.
+    /// Left must be a lvalue, but this check is left to the cgen phase.
     /// </remarks>
-	public class Assignment : Expr
+    public sealed class Assignment : Expr
     {
-        public Assignment(Expr lhs, Expr rhs)
+        private Assignment(Expr left, Expr right)
         {
-            this.lhs = lhs;
-            this.rhs = rhs;
+            this.Left = left;
+            this.Right = right;
         }
-        public readonly Expr lhs;
-        public readonly Expr rhs;
+
+        public Expr Left { get; }
+        public Expr Right { get; }
+
+        public static Expr Create(Expr left, Expr right) =>
+            new Assignment(left, right);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr lhs = this.lhs.GetExpr(env);
-            AST.Expr rhs = this.rhs.GetExpr(env);
-            rhs = AST.TypeCast.MakeCast(rhs, lhs.type);
-            return new AST.Assignment(lhs, rhs, lhs.type);
+            var left = SemantExpr(this.Left, ref env);
+            var right = SemantExpr(this.Right, ref env);
+            right = AST.TypeCast.MakeCast(right, left.Type);
+            return new AST.Assign(left, right, left.Type);
         }
     }
 
@@ -33,118 +36,128 @@ namespace SyntaxTree
     /// </summary>
     public abstract class AssignOp : Expr
     {
-        public AssignOp(Expr lhs, Expr rhs)
+        protected AssignOp(Expr left, Expr right)
         {
-            this.lhs = lhs;
-            this.rhs = rhs;
+            this.Left = left;
+            this.Right = right;
         }
-        public readonly Expr lhs;
-        public readonly Expr rhs;
+
+        public Expr Left { get; }
+        public Expr Right { get; }
 
         public abstract Expr ConstructBinaryOp();
 
         public override AST.Expr GetExpr(AST.Env env) =>
-            (new Assignment(lhs, ConstructBinaryOp())).GetExpr(env);
-
+            Assignment.Create(this.Left, ConstructBinaryOp()).GetExpr(env);
     }
 
     /// <summary>
     /// MultAssign: a *= b
     /// </summary>
-	public class MultAssign : AssignOp
+	public sealed class MultAssign : AssignOp
     {
-        public MultAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new Multiply(lhs, rhs);
+        private MultAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new MultAssign(left, right);
+        public override Expr ConstructBinaryOp() => Multiply.Create(this.Left, this.Right);
     }
 
     /// <summary>
     /// DivAssign: a /= b
     /// </summary>
-	public class DivAssign : AssignOp
+	public sealed class DivAssign : AssignOp
     {
-        public DivAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new Divide(lhs, rhs);
+        private DivAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new DivAssign(left, right);
+        public override Expr ConstructBinaryOp() => Divide.Create(this.Left, this.Right);
     }
 
     /// <summary>
     /// ModAssign: a %= b
     /// </summary>
-    public class ModAssign : AssignOp
+    public sealed class ModAssign : AssignOp
     {
-        public ModAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new Modulo(lhs, rhs);
+        private ModAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new ModAssign(left, right);
+        public override Expr ConstructBinaryOp() => Modulo.Create(this.Left, this.Right);
     }
 
     /// <summary>
     /// AddAssign: a += b
     /// </summary>
-    public class AddAssign : AssignOp
+    public sealed class AddAssign : AssignOp
     {
-        public AddAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new Add(lhs, rhs);
+        private AddAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new AddAssign(left, right);
+        public override Expr ConstructBinaryOp() => Add.Create(this.Left, this.Right);
     }
 
     /// <summary>
     /// SubAssign: a -= b
     /// </summary>
-    public class SubAssign : AssignOp
+    public sealed class SubAssign : AssignOp
     {
-        public SubAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new Sub(lhs, rhs);
+        private SubAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new SubAssign(left, right);
+        public override Expr ConstructBinaryOp() => Sub.Create(this.Left, this.Right);
     }
 
     /// <summary>
-    /// LShiftAssign: a <<= b
+    /// LShiftAssign: a &lt;&lt;= b
     /// </summary>
-    public class LShiftAssign : AssignOp
+    public sealed class LShiftAssign : AssignOp
     {
-        public LShiftAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new LShift(lhs, rhs);
+        private LShiftAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new LShiftAssign(left, right);
+        public override Expr ConstructBinaryOp() => LShift.Create(this.Left, this.Right);
     }
 
     /// <summary>
     /// RShiftAssign: a >>= b
     /// </summary>
-    public class RShiftAssign : AssignOp
+    public sealed class RShiftAssign : AssignOp
     {
-        public RShiftAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new RShift(lhs, rhs);
+        private RShiftAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new RShiftAssign(left, right);
+        public override Expr ConstructBinaryOp() => RShift.Create(this.Left, this.Right);
     }
 
     /// <summary>
     /// BitwiseAndAssign: a &= b
     /// </summary>
-    public class BitwiseAndAssign : AssignOp
+    public sealed class BitwiseAndAssign : AssignOp
     {
-        public BitwiseAndAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new BitwiseAnd(lhs, rhs);
+        private BitwiseAndAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new BitwiseAndAssign(left, right);
+        public override Expr ConstructBinaryOp() => BitwiseAnd.Create(this.Left, this.Right);
     }
 
     /// <summary>
     /// XorAssign: a ^= b
     /// </summary>
-    public class XorAssign : AssignOp
+    public sealed class XorAssign : AssignOp
     {
-        public XorAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new Xor(lhs, rhs);
+        private XorAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new XorAssign(left, right);
+        public override Expr ConstructBinaryOp() => Xor.Create(this.Left, this.Right);
     }
 
     /// <summary>
     /// BitwiseOrAssign: a |= b
     /// </summary>
-    public class BitwiseOrAssign : AssignOp
+    public sealed class BitwiseOrAssign : AssignOp
     {
-        public BitwiseOrAssign(Expr lhs, Expr rhs)
-            : base(lhs, rhs) { }
-        public override Expr ConstructBinaryOp() => new BitwiseOr(lhs, rhs);
+        private BitwiseOrAssign(Expr left, Expr right)
+            : base(left, right) { }
+        public static Expr Create(Expr left, Expr right) => new BitwiseOrAssign(left, right);
+        public override Expr ConstructBinaryOp() => BitwiseOr.Create(this.Left, this.Right);
     }
 }

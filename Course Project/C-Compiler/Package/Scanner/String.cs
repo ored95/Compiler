@@ -1,168 +1,165 @@
 ﻿using System;
 
-// String literal
-// --------------
-public class TokenString : Token
+namespace LexicalAnalysis
 {
-    public TokenString(String _val, Int32 _idx, String _raw)
-        : base(TokenType.STRING)
+    /// <summary>
+    /// String literal
+    /// </summary>
+    public sealed class TokenString : Token
     {
-        val = _val;
-        idx = _idx;
-        raw = _raw;
-    }
-    public readonly String raw;
-    public readonly String val;
-    public readonly Int32 idx;
-
-    public override String ToString()
-    {
-        return type.ToString() + ": " + "\"" + raw + "\"" + "\n\"" + val + "\"";
-    }
-}
-
-public class FSAString : FSA
-{
-    private enum State
-    {
-        START,
-        END,
-        ERROR,
-        L,
-        Q,
-        QQ
-    };
-
-    private State state;
-    private FSAChar fsachar;
-    public String val;
-    public String raw;
-
-    public FSAString()
-    {
-        state = State.START;
-        fsachar = new FSAChar('\"');
-        raw = "";
-        val = "";
-    }
-
-    public override sealed void Reset()
-    {
-        state = State.START;
-        fsachar.Reset();
-        raw = "";
-        val = "";
-    }
-
-    public override sealed FSAStatus GetStatus()
-    {
-        if (state == State.START)
+        public TokenString(String val, String raw)
         {
-            return FSAStatus.NONE;
+            if (val == null)
+            {
+                throw new ArgumentNullException(nameof(val));
+            }
+            this.Val = val;
+            this.Raw = raw;
         }
-        else if (state == State.END)
+
+        public override TokenKind Kind { get; } = TokenKind.STRING;
+        public String Raw { get; }
+        public String Val { get; }
+
+        public override String ToString() =>
+            $"{this.Kind}: \"{this.Raw}\"\n\"{this.Val}\"";
+    }
+
+    public sealed class FSAString : FSA
+    {
+        private enum State
         {
-            return FSAStatus.END;
+            START,
+            END,
+            ERROR,
+            L,
+            Q,
+            QQ
+        };
+
+        private State _state;
+        private readonly FSAChar _fsachar;
+        private String _val;
+        private String _raw;
+
+        public FSAString()
+        {
+            this._state = State.START;
+            this._fsachar = new FSAChar('\"');
+            this._raw = "";
+            this._val = "";
         }
-        else if (state == State.ERROR)
+
+        public override void Reset()
         {
-            return FSAStatus.ERROR;
+            this._state = State.START;
+            this._fsachar.Reset();
+            this._raw = "";
+            this._val = "";
         }
-        else
+
+        public override FSAStatus GetStatus()
         {
+            if (this._state == State.START)
+            {
+                return FSAStatus.NONE;
+            }
+            if (this._state == State.END)
+            {
+                return FSAStatus.END;
+            }
+            if (this._state == State.ERROR)
+            {
+                return FSAStatus.ERROR;
+            }
             return FSAStatus.RUNNING;
         }
-    }
 
-    public override sealed Token RetrieveToken()
-    {
-        Int32 idx;
-        if ((idx = StringTable.entrys.FindIndex(x => x == raw)) == -1)
+        public override Token RetrieveToken()
         {
-            StringTable.entrys.Add(raw);
-            idx = StringTable.entrys.Count - 1;
+            return new TokenString(this._val, this._raw);
         }
-        return new TokenString(val, idx, raw);
-    }
 
-    public override sealed void ReadChar(Char ch)
-    {
-        switch (state)
+        public override void ReadChar(Char ch)
         {
-            case State.END:
-            case State.ERROR:
-                state = State.ERROR;
-                break;
-            case State.START:
-                switch (ch)
-                {
-                    case 'L':
-                        state = State.L;
-                        break;
-                    case '\"':
-                        state = State.Q;
-                        fsachar.Reset();
-                        break;
-                    default:
-                        state = State.ERROR;
-                        break;
-                }
-                break;
-            case State.L:
-                if (ch == '\"')
-                {
-                    state = State.Q;
-                    fsachar.Reset();
-                }
-                else
-                {
-                    state = State.ERROR;
-                }
-                break;
-            case State.Q:
-                if (fsachar.GetStatus() == FSAStatus.NONE && ch == '\"')
-                {
-                    state = State.QQ;
-                    fsachar.Reset();
-                }
-                else
-                {
-                    fsachar.ReadChar(ch);
-                    switch (fsachar.GetStatus())
+            switch (this._state)
+            {
+                case State.END:
+                case State.ERROR:
+                    this._state = State.ERROR;
+                    break;
+                case State.START:
+                    switch (ch)
                     {
-                        case FSAStatus.END:
-                            state = State.Q;
-                            val = val + fsachar.RetrieveChar();
-                            raw = raw + fsachar.RetrieveRaw();
-                            fsachar.Reset();
-                            ReadChar(ch);
+                        case 'L':
+                            this._state = State.L;
                             break;
-                        case FSAStatus.ERROR:
-                            state = State.ERROR;
+                        case '\"':
+                            this._state = State.Q;
+                            this._fsachar.Reset();
                             break;
                         default:
+                            this._state = State.ERROR;
                             break;
                     }
-                }
-                break;
-            case State.QQ:
-                state = State.END;
-                break;
-            default:
-                state = State.ERROR;
-                break;
+                    break;
+                case State.L:
+                    if (ch == '\"')
+                    {
+                        this._state = State.Q;
+                        this._fsachar.Reset();
+                    }
+                    else
+                    {
+                        this._state = State.ERROR;
+                    }
+                    break;
+                case State.Q:
+                    if (this._fsachar.GetStatus() == FSAStatus.NONE && ch == '\"')
+                    {
+                        this._state = State.QQ;
+                        this._fsachar.Reset();
+                    }
+                    else
+                    {
+                        this._fsachar.ReadChar(ch);
+                        switch (this._fsachar.GetStatus())
+                        {
+                            case FSAStatus.END:
+                                this._state = State.Q;
+                                this._val = this._val + this._fsachar.RetrieveChar();
+                                this._raw = this._raw + this._fsachar.RetrieveRaw();
+                                this._fsachar.Reset();
+                                ReadChar(ch);
+                                break;
+                            case FSAStatus.ERROR:
+                                this._state = State.ERROR;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    break;
+                case State.QQ:
+                    this._state = State.END;
+                    break;
+                default:
+                    this._state = State.ERROR;
+                    break;
+            }
         }
-    }
 
-    public override sealed void ReadEOF()
-    {
-        if (state == State.QQ)
+        public override void ReadEOF()
         {
-            state = State.END;
+            if (this._state == State.QQ)
+            {
+                this._state = State.END;
+            }
+            else
+            {
+                this._state = State.ERROR;
+            }
         }
-        else
-        {
-            state = State.ERROR;
-        }
+
     }
 }

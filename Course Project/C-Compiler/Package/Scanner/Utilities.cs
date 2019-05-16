@@ -1,75 +1,76 @@
 ﻿using System;
 
-static class Utils
+namespace LexicalAnalysis
 {
-    // IsEscapeChar : Char -> Boolean
-    // ==============================
-    // 
-    public static Boolean IsEscapeChar(Char ch)
+    public static class Utils
     {
-        switch (ch)
-        {
-            case 'a':
-            case 'b':
-            case 'f':
-            case 'n':
-            case 'r':
-            case 't':
-            case 'v':
-            case '\'':
-            case '\"':
-            case '\\':
-            case '?':
-                return true;
-            default:
-                return false;
-        }
-    }
 
-    // IsHexDigit : Char -> Boolean
-    // ============================
-    // 
-    public static Boolean IsHexDigit(Char ch)
-    {
-        return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
-    }
+        // IsEscapeChar : Char -> Boolean
+        // ==============================
+        // 
+        public static Boolean IsEscapeChar(Char ch)
+        {
+            switch (ch)
+            {
+                case 'a':
+                case 'b':
+                case 'f':
+                case 'n':
+                case 'r':
+                case 't':
+                case 'v':
+                case '\'':
+                case '\"':
+                case '\\':
+                case '?':
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
-    // IsOctDigit : Char -> Boolean
-    // ============================
-    // 
-    public static Boolean IsOctDigit(Char ch)
-    {
-        return ch >= '0' && ch <= '7';
-    }
+        // IsHexDigit : Char -> Boolean
+        // ============================
+        // 
+        public static Boolean IsHexDigit(Char ch)
+        {
+            return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+        }
 
-    // GetHexDigit : Char -> Int64
-    // ===========================
-    // 
-    public static Int64 GetHexDigit(Char ch)
-    {
-        if (ch >= '0' && ch <= '9')
+        // IsOctDigit : Char -> Boolean
+        // ============================
+        // 
+        public static Boolean IsOctDigit(Char ch)
         {
-            return ch - '0';
+            return ch >= '0' && ch <= '7';
         }
-        else if (ch >= 'a' && ch <= 'f')
+
+        // GetHexDigit : Char -> Int64
+        // ===========================
+        // 
+        public static Int64 GetHexDigit(Char ch)
         {
-            return ch - 'a' + 0xA;
-        }
-        else if (ch >= 'A' && ch <= 'F')
-        {
-            return ch - 'A' + 0xA;
-        }
-        else
-        {
+            if (ch >= '0' && ch <= '9')
+            {
+                return ch - '0';
+            }
+            if (ch >= 'a' && ch <= 'f')
+            {
+                return ch - 'a' + 0xA;
+            }
+            if (ch >= 'A' && ch <= 'F')
+            {
+                return ch - 'A' + 0xA;
+            }
             throw new Exception("GetHexDigit: Character is not a hex digit. You should first call IsHexDigit(ch) for a check.");
         }
-    }
 
-    // IsSpace : Char -> Boolean
-    // =========================
-    // 
-    public static Boolean IsSpace(Char ch)
-    {
-        return (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\f' || ch == '\v');
+        // IsSpace : Char -> Boolean
+        // =========================
+        // 
+        public static Boolean IsSpace(Char ch)
+        {
+            return (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\f' || ch == '\v');
+        }
     }
 }

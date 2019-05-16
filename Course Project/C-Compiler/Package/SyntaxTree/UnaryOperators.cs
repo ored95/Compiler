@@ -1,23 +1,33 @@
 ﻿using System;
+using static SyntaxTree.SemanticAnalysis;
 
 namespace SyntaxTree
 {
+
+    public abstract class UnaryExprOperator : Expr
+    {
+        protected UnaryExprOperator(Expr expr)
+        {
+            this.Expr = expr;
+        }
+        public Expr Expr { get; }
+    }
+
     /// <summary>
     /// Postfix increment: x++
     /// </summary>
-    public class PostIncrement : Expr
+    // TODO: Check lvalue
+    public sealed class PostIncrement : UnaryExprOperator
     {
         public PostIncrement(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
+            : base(expr) { }
+        public static Expr Create(Expr expr) => new PostIncrement(expr);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
+            AST.Expr expr = this.Expr.GetExpr(env);
 
-            if (!expr.type.IsScalar())
+            if (!expr.Type.IsScalar)
             {
                 throw new InvalidOperationException("Expected a scalar.");
             }
@@ -29,19 +39,18 @@ namespace SyntaxTree
     /// <summary>
     /// Postfix decrement: x--
     /// </summary>
-    public class PostDecrement : Expr
+    // TODO: Check lvalue
+    public sealed class PostDecrement : UnaryExprOperator
     {
         public PostDecrement(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
+            : base(expr) { }
+        public static Func<Expr, Expr> Create { get; } = expr => new PostDecrement(expr);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
+            AST.Expr expr = this.Expr.GetExpr(env);
 
-            if (!expr.type.IsScalar())
+            if (!expr.Type.IsScalar)
             {
                 throw new InvalidOperationException("Expected a scalar.");
             }
@@ -53,55 +62,60 @@ namespace SyntaxTree
     /// <summary>
     /// sizeof(type)
     /// </summary>
-    public class SizeofType : Expr
+    public sealed class SizeofType : Expr
     {
-        public SizeofType(TypeName type_name)
+        public SizeofType(TypeName typeName)
         {
-            this.type_name = type_name;
+            this.TypeName = typeName;
         }
-        public readonly TypeName type_name;
+        public TypeName TypeName { get; }
+        public static Expr Create(TypeName typeName) =>
+            new SizeofType(typeName);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.ExprType type = type_name.GetExprType(env);
-            return new AST.ConstULong((UInt32)type.SizeOf);
+            //Tuple<AST.Env, AST.ExprType> type_env = this.TypeName.GetTypeEnv(env);
+            //env = type_env.Item1;
+            //AST.ExprType type = type_env.Item2;
+
+            var type = Semant(this.TypeName.GetExprType, ref env);
+
+            return new AST.ConstULong((UInt32)type.SizeOf, env);
         }
     }
 
     /// <summary>
-    /// sizeof(expr)
+    /// sizeof(Expr)
     /// </summary>
-    public class SizeofExpr : Expr
+    public sealed class SizeofExpr : UnaryExprOperator
     {
         public SizeofExpr(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
+            : base(expr) { }
+        public static Expr Create(Expr expr) =>
+            new SizeofExpr(expr);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
-            return new AST.ConstULong((UInt32)expr.type.SizeOf);
+            AST.Expr expr = this.Expr.GetExpr(env);
+            return new AST.ConstULong((UInt32)expr.Type.SizeOf, env);
         }
     }
 
     /// <summary>
     /// Prefix increment: ++x
     /// </summary>
-    public class PrefixIncrement : Expr
+    public sealed class PreIncrement : UnaryExprOperator
     {
-        public PrefixIncrement(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
+        public PreIncrement(Expr expr)
+            : base(expr) { }
+        public static Expr Create(Expr expr) =>
+            new PreIncrement(expr);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
+            AST.Expr expr = this.Expr.GetExpr(env);
 
-            if (!expr.type.IsScalar())
+            if (!expr.Type.IsScalar)
             {
                 throw new InvalidOperationException("Expected a scalar.");
             }
@@ -113,19 +127,18 @@ namespace SyntaxTree
     /// <summary>
     /// Prefix decrement: --x
     /// </summary>
-    public class PreDecrement : Expr
+    public sealed class PreDecrement : UnaryExprOperator
     {
         public PreDecrement(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
+            : base(expr) { }
+        public static Expr Create(Expr expr) =>
+            new PreDecrement(expr);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
+            AST.Expr expr = this.Expr.GetExpr(env);
 
-            if (!expr.type.IsScalar())
+            if (!expr.Type.IsScalar)
             {
                 throw new InvalidOperationException("Expected a scalar.");
             }
@@ -135,47 +148,44 @@ namespace SyntaxTree
     }
 
     /// <summary>
-    /// Reference: &expr
+    /// Reference: &Expr
     /// </summary>
-    public class Reference : Expr
+    public sealed class Reference : UnaryExprOperator
     {
         public Reference(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
+            : base(expr) { }
+        public static Expr Create(Expr expr) =>
+            new Reference(expr);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
-            return new AST.Reference(expr, new AST.TPointer(expr.type));
+            AST.Expr expr = this.Expr.GetExpr(env);
+            return new AST.Reference(expr);
         }
     }
 
     /// <summary>
-    /// Dereference: *expr
+    /// Dereference: *Expr
     /// 
-    /// Note that expr might have an **incomplete** type.
+    /// Note that Expr might have an **incomplete** type.
     /// We need to search the environment
     /// </summary>
-    public class Dereference : Expr
+    public sealed class Dereference : UnaryExprOperator
     {
         public Dereference(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
+            : base(expr) { }
+        public static Expr Create(Expr expr) => new Dereference(expr);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
+            AST.Expr expr = this.Expr.GetExpr(env);
 
-            if (expr.type.kind != AST.ExprType.Kind.POINTER)
+            if (expr.Type.kind != AST.ExprType.Kind.POINTER)
             {
                 throw new InvalidOperationException("Expected a pointer.");
             }
 
-            AST.ExprType type = ((AST.TPointer)expr.type).ref_t;
+            AST.ExprType type = ((AST.TPointer)expr.Type).ref_t;
             if (type.kind == AST.ExprType.Kind.STRUCT_OR_UNION && !((AST.TStructOrUnion)type).IsComplete)
             {
                 throw new InvalidOperationException("Cannot dereference incomplete type.");
@@ -188,19 +198,17 @@ namespace SyntaxTree
     /// <summary>
     /// Merely a check on arithmetic type.
     /// </summary>
-    public class Positive : Expr
+    public sealed class Positive : UnaryExprOperator
     {
         public Positive(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
-
+            : base(expr) { }
+        public static Expr Create(Expr expr) =>
+            new Positive(expr);
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
+            AST.Expr expr = this.Expr.GetExpr(env);
 
-            if (!expr.type.IsArith())
+            if (!expr.Type.IsArith)
             {
                 throw new InvalidOperationException("Expected arithmetic type.");
             }
@@ -212,149 +220,162 @@ namespace SyntaxTree
     /// <summary>
     /// Negative: requires arithmetic type.
     /// </summary>
-    public class Negative : Expr
+    public sealed class Negative : UnaryExprOperator
     {
         public Negative(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
-
+            : base(expr) { }
+        public static Expr Create(Expr expr) =>
+            new Negative(expr);
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
+            AST.Expr expr = this.Expr.GetExpr(env);
 
-            if (!expr.type.IsArith())
+            if (!expr.Type.IsArith)
             {
                 throw new InvalidOperationException("Expected arithmetic type.");
             }
 
-            if (expr.IsConstExpr())
+            if (expr.Type.IsIntegral)
             {
-                switch (expr.type.kind)
+                expr = AST.TypeCast.IntegralPromotion(expr).Item1;
+            }
+
+            if (expr.IsConstExpr)
+            {
+                switch (expr.Type.kind)
                 {
                     case AST.ExprType.Kind.LONG:
-                        return new AST.ConstLong(-((AST.ConstLong)expr).value);
+                        return new AST.ConstLong(-((AST.ConstLong)expr).value, env);
+
                     case AST.ExprType.Kind.ULONG:
-                        return new AST.ConstLong(-(Int32)((AST.ConstULong)expr).value);
+                        return new AST.ConstLong(-(Int32)((AST.ConstULong)expr).value, env);
+
                     case AST.ExprType.Kind.FLOAT:
-                        return new AST.ConstFloat(-((AST.ConstFloat)expr).value);
+                        return new AST.ConstFloat(-((AST.ConstFloat)expr).value, env);
+
                     case AST.ExprType.Kind.DOUBLE:
-                        return new AST.ConstDouble(-((AST.ConstDouble)expr).value);
+                        return new AST.ConstDouble(-((AST.ConstDouble)expr).value, env);
+
                     default:
                         throw new InvalidOperationException();
                 }
             }
 
-            return new AST.Negative(expr, expr.type);
+            return new AST.Negative(expr, expr.Type);
         }
     }
 
     /// <summary>
     /// Bitwise not: requires integral.
     /// </summary>
-    public class BitwiseNot : Expr
+    public sealed class BitwiseNot : UnaryExprOperator
     {
         public BitwiseNot(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
-
+            : base(expr) { }
+        public static Expr Create(Expr expr) =>
+            new BitwiseNot(expr);
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
+            AST.Expr expr = this.Expr.GetExpr(env);
 
-            if (!expr.type.IsIntegral())
+            if (!expr.Type.IsIntegral)
             {
                 throw new InvalidOperationException("Expected integral type.");
             }
 
-            if (expr.IsConstExpr())
+            expr = AST.TypeCast.IntegralPromotion(expr).Item1;
+
+            if (expr.IsConstExpr)
             {
-                switch (expr.type.kind)
+                switch (expr.Type.kind)
                 {
                     case AST.ExprType.Kind.LONG:
-                        return new AST.ConstLong(~((AST.ConstLong)expr).value);
+                        return new AST.ConstLong(~((AST.ConstLong)expr).value, env);
                     case AST.ExprType.Kind.ULONG:
-                        return new AST.ConstULong(~((AST.ConstULong)expr).value);
+                        return new AST.ConstULong(~((AST.ConstULong)expr).value, env);
                     default:
                         throw new InvalidOperationException();
                 }
             }
 
-            return new AST.BitwiseNot(expr, expr.type);
+            return new AST.BitwiseNot(expr, expr.Type);
         }
     }
 
     /// <summary>
     /// Logical not
     /// </summary>
-    public class LogicalNot : Expr
+    public sealed class LogicalNot : UnaryExprOperator
     {
         public LogicalNot(Expr expr)
-        {
-            this.expr = expr;
-        }
-        public readonly Expr expr;
+            : base(expr) { }
+        public static Expr Create(Expr expr) =>
+            new LogicalNot(expr);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            AST.Expr expr = this.expr.GetExpr(env);
+            var expr = this.Expr.GetExpr(env);
 
-            if (!expr.type.IsArith())
+            if (!expr.Type.IsArith)
             {
                 throw new InvalidOperationException("Expected arithmetic type.");
             }
 
-            if (expr.IsConstExpr())
+            if (expr.Type.IsIntegral)
             {
-                Boolean is_zero;
-                switch (expr.type.kind)
+                expr = AST.TypeCast.IntegralPromotion(expr).Item1;
+            }
+
+            if (expr.IsConstExpr)
+            {
+                Boolean isZero;
+                switch (expr.Type.kind)
                 {
                     case AST.ExprType.Kind.LONG:
-                        is_zero = ((AST.ConstLong)expr).value == 0;
+                        isZero = ((AST.ConstLong)expr).value == 0;
                         break;
                     case AST.ExprType.Kind.ULONG:
-                        is_zero = ((AST.ConstULong)expr).value == 0;
+                        isZero = ((AST.ConstULong)expr).value == 0;
                         break;
                     case AST.ExprType.Kind.FLOAT:
-                        is_zero = ((AST.ConstFloat)expr).value == 0;
+                        isZero = ((AST.ConstFloat)expr).value == 0;
                         break;
                     case AST.ExprType.Kind.DOUBLE:
-                        is_zero = ((AST.ConstDouble)expr).value == 0;
+                        isZero = ((AST.ConstDouble)expr).value == 0;
                         break;
                     default:
                         throw new InvalidOperationException();
                 }
-                return new AST.ConstLong(Convert.ToInt32(is_zero));
+                return new AST.ConstLong(Convert.ToInt32(isZero), env);
             }
 
-            return new AST.LogicalNot(expr, new AST.TLong(expr.type.is_const, expr.type.is_volatile));
+            return new AST.LogicalNot(expr, new AST.TLong(expr.Type.is_const, expr.Type.is_volatile));
         }
     }
 
     /// <summary>
     /// User-specified explicit type cast
     /// </summary>
-    public class TypeCast : Expr
+    public sealed class TypeCast : Expr
     {
-        public TypeCast(TypeName type_name, Expr expr)
+        public TypeCast(TypeName typeName, Expr expr)
         {
-            this.type_name = type_name;
-            this.expr = expr;
+            this.TypeName = typeName;
+            this.Expr = expr;
         }
-        public readonly TypeName type_name;
-        public readonly Expr expr;
+
+        public TypeName TypeName { get; }
+        public Expr Expr { get; }
+
+        public static Expr Create(TypeName typeName, Expr expr) =>
+            new TypeCast(typeName, expr);
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            // TODO: does this change environment?
-            AST.ExprType type = type_name.GetExprType(env);
-
-            AST.Expr expr = this.expr.GetExpr(env);
-
+            AST.ExprType type = Semant(this.TypeName.GetExprType, ref env);
+            AST.Expr expr = this.Expr.GetExpr(env);
             return AST.TypeCast.MakeCast(expr, type);
         }
     }
+
 }

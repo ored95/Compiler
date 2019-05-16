@@ -1,9 +1,0 @@
-C:\Users\TA\Desktop\Compiler\Course Project\C-Compiler\C-Compiler\bin\Debug\C-Compiler.exe.config
-C:\Users\TA\Desktop\Compiler\Course Project\C-Compiler\C-Compiler\bin\Debug\C-Compiler.exe
-C:\Users\TA\Desktop\Compiler\Course Project\C-Compiler\C-Compiler\bin\Debug\C-Compiler.pdb
-C:\Users\TA\Desktop\Compiler\Course Project\C-Compiler\C-Compiler\bin\Debug\System.Collections.Immutable.dll
-C:\Users\TA\Desktop\Compiler\Course Project\C-Compiler\C-Compiler\obj\Debug\C-Compiler.csprojAssemblyReference.cache
-C:\Users\TA\Desktop\Compiler\Course Project\C-Compiler\C-Compiler\obj\Debug\C-Compiler.csproj.CoreCompileInputs.cache
-C:\Users\TA\Desktop\Compiler\Course Project\C-Compiler\C-Compiler\obj\Debug\C-Compiler.csproj.CopyComplete
-C:\Users\TA\Desktop\Compiler\Course Project\C-Compiler\C-Compiler\obj\Debug\C-Compiler.exe
-C:\Users\TA\Desktop\Compiler\Course Project\C-Compiler\C-Compiler\obj\Debug\C-Compiler.pdb

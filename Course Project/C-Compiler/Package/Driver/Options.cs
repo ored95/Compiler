@@ -2,47 +2,51 @@
 
 public abstract class Option<T>
 {
-    public Option<O> Map<O>(Converter<T, O> Convert)
+    public Option<O> Map<O>(Converter<T, O> converter)
     {
-        if (IsSome)
+        if (this.IsSome)
         {
-            return new Some<O>(Convert(value));
+            return new Some<O>(converter(this.Value));
         }
-        else
-        {
-            return new None<O>();
-        }
+        return new None<O>();
     }
-    public abstract T value { get; }
+
+    public abstract T Value { get; }
     public abstract Boolean IsSome { get; }
     public abstract Boolean IsNone { get; }
+
+    public static Option<T> None { get; } = new None<T>();
+}
+
+public static class Option
+{
+    public static Option<T> Some<T>(T value) => new Some<T>(value);
 }
 
 public sealed class None<T> : Option<T>
 {
-    public override T value
+    public override T Value
     {
         get
         {
             throw new NotSupportedException("No value in None.");
         }
     }
-    public override Boolean IsSome { get { return false; } }
-    public override Boolean IsNone { get { return true; } }
+    public override Boolean IsSome => false;
+    public override Boolean IsNone => true;
 }
 
 public sealed class Some<T> : Option<T>
 {
-    private readonly T _value;
     public Some(T value)
     {
         if (value == null)
         {
-            throw new ArgumentNullException("value", "The value in Some cannot be null.");
+            throw new ArgumentNullException(nameof(value), "The value in Some cannot be null.");
         }
-        _value = value;
+        this.Value = value;
     }
-    public override T value { get { return _value; } }
-    public override Boolean IsSome { get { return true; } }
-    public override Boolean IsNone { get { return false; } }
+    public override T Value { get; }
+    public override Boolean IsSome => true;
+    public override Boolean IsNone => false;
 }

@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "C-Compiler", "C-Compiler\C-
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test", "ParseTests\Test.csproj", "{CB5D59C6-A354-4D5F-8CC2-103ABDF52697}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Package", "Package\Package.csproj", "{7F6E7006-575D-4EB3-A4DF-453EDB055DEE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FullCourse", "Package\FullCourse.csproj", "{7F6E7006-575D-4EB3-A4DF-453EDB055DEE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

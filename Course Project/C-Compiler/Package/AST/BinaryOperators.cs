@@ -1,18 +1,21 @@
 ﻿using System;
 using System.Diagnostics;
+using CodeGeneration;
 
 namespace AST
 {
+
     public abstract class BinaryOp : Expr
     {
-        public BinaryOp(Expr lhs, Expr rhs, ExprType type)
+        protected BinaryOp(Expr left, Expr right, ExprType type)
             : base(type)
         {
-            this.lhs = lhs;
-            this.rhs = rhs;
+            this.Left = left;
+            this.Right = right;
         }
-        public readonly Expr lhs;
-        public readonly Expr rhs;
+        public Expr Left { get; }
+        public Expr Right { get; }
+        public override Env Env => this.Right.Env;
     }
 
     /// <summary>
@@ -23,70 +26,70 @@ namespace AST
     /// 2) ulong op ulong
     /// 
     /// The procedure is always:
-    /// %eax = lhs, %ebx = rhs
+    /// %eax = Left, %ebx = Right
     /// %eax = %eax op %ebx
     /// </summary>
     public abstract class BinaryIntegralOp : BinaryOp
     {
-        public BinaryIntegralOp(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        protected BinaryIntegralOp(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public abstract void OperateLong(CGenState state);
         public abstract void OperateULong(CGenState state);
 
         public void CGenPrepareWord(Env env, CGenState state)
         {
-            // 1. Load lhs to EAX.
+            // 1. Load Left to EAX.
             // 
             // regs:
-            // %eax = lhs
+            // %eax = Left
             // 
             // stack:
             // +-----+
             // | ... | <- %esp
             // +-----+
             // 
-            if (lhs.CGenValue(env, state) != Reg.EAX)
+            if (this.Left.CGenValue(env, state) != Reg.EAX)
             {
                 throw new InvalidOperationException();
             }
 
-            // 2. Push lhs to stack.
+            // 2. Push Left to stack.
             // 
             // regs:
-            // %eax = lhs
+            // %eax = Left
             // 
             // stack:
             // +-----+
             // | ... |
             // +-----+
-            // | lhs | <- %esp has decreased by 4
+            // | Left | <- %esp has decreased by 4
             // +-----+
             // 
             Int32 stack_size = state.CGenPushLong(Reg.EAX);
 
-            // 3. Load rhs to EAX.
+            // 3. Load Right to EAX.
             // 
             // regs:
-            // %eax = rhs
+            // %eax = Right
             // 
             // stack:
             // +-----+
             // | ... |
             // +-----+
-            // | lhs | <- %esp
+            // | Left | <- %esp
             // +-----+
             // 
-            if (rhs.CGenValue(env, state) != Reg.EAX)
+            if (this.Right.CGenValue(env, state) != Reg.EAX)
             {
                 throw new InvalidOperationException();
             }
 
-            // 4. Move rhs into EBX. Pop lhs from stack, into EAX.
+            // 4. Move Right into EBX. Pop Left from stack, into EAX.
             // 
             // regs:
-            // %eax = lhs
-            // %ebx = rhs
+            // %eax = Left
+            // %ebx = Right
             // 
             // stack:
             // +-----+
@@ -113,17 +116,17 @@ namespace AST
 
         public override Reg CGenValue(Env env, CGenState state)
         {
-            switch (type.kind)
+            switch (this.Left.Type.kind)
             {
                 case ExprType.Kind.LONG:
-                    if (lhs.type.kind != ExprType.Kind.LONG || rhs.type.kind != ExprType.Kind.LONG)
+                    if (this.Left.Type.kind != ExprType.Kind.LONG || this.Right.Type.kind != ExprType.Kind.LONG)
                     {
                         throw new InvalidOperationException();
                     }
                     return CGenLong(env, state);
 
                 case ExprType.Kind.ULONG:
-                    if (lhs.type.kind != ExprType.Kind.ULONG || rhs.type.kind != ExprType.Kind.ULONG)
+                    if (this.Left.Type.kind != ExprType.Kind.ULONG || this.Right.Type.kind != ExprType.Kind.ULONG)
                     {
                         throw new InvalidOperationException();
                     }
@@ -147,21 +150,19 @@ namespace AST
     /// 
     /// The procedure for long or ulong is the same as that of binary integral operators.
     /// The procedure for float and double is always:
-    /// %st(0) = lhs, %st(1) = rhs
+    /// %st(0) = Left, %st(1) = Right
     /// %st(0) = %st(0) op %st(1), invalidate %st(1)
     /// </summary>
     public abstract class BinaryArithmeticOp : BinaryIntegralOp
     {
-        public BinaryArithmeticOp(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        protected BinaryArithmeticOp(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
         public abstract void OperateFloat(CGenState state);
         public abstract void OperateDouble(CGenState state);
 
         public Reg CGenFloat(Env env, CGenState state)
         {
-            Reg ret;
-
-            // 1. Load lhs to ST0. Now the float stack should only contain one element.
+            // 1. Load Left to ST0. Now the float stack should only contain one element.
             //
             // memory stack:
             // +-----+
@@ -171,10 +172,10 @@ namespace AST
             //
             // float stack:
             // +-----+
-            // | lhs | <- %st(0)
+            // | Left | <- %st(0)
             // +-----+
             // 
-            ret = lhs.CGenValue(env, state);
+            var ret = this.Left.CGenValue(env, state);
             if (ret != Reg.ST0)
             {
                 throw new InvalidOperationException();
@@ -186,7 +187,7 @@ namespace AST
             // +-----+
             // |     |
             // | ... |
-            // | lhs | <- %esp has decreased by 4
+            // | Left | <- %esp has decreased by 4
             // +-----+
             //
             // float stack:
@@ -194,27 +195,27 @@ namespace AST
             // 
             Int32 stack_size = state.CGenPushFloatP();
 
-            // 3. Load rhs to ST0. Now the float stack should only contain one element.
+            // 3. Load Right to ST0. Now the float stack should only contain one element.
             //
             // memory stack:
             // +-----+
             // |     |
             // | ... |
-            // | lhs | <- %esp
+            // | Left | <- %esp
             // +-----+
             //
             // float stack:
             // +-----+
-            // | rhs | <- %st(0)
+            // | Right | <- %st(0)
             // +-----+
             // 
-            ret = rhs.CGenValue(env, state);
+            ret = this.Right.CGenValue(env, state);
             if (ret != Reg.ST0)
             {
                 throw new InvalidOperationException();
             }
 
-            // 4. Pop double from memory stack, push into float stack. Now both lhs and rhs are in float stack.
+            // 4. Pop double from memory stack, push into float stack. Now both Left and Right are in float stack.
             //
             // memory stack:
             // +-----+
@@ -224,9 +225,9 @@ namespace AST
             //
             // float stack:
             // +-----+
-            // | rhs | <- %st(1)
+            // | Right | <- %st(1)
             // +-----+
-            // | lhs | <- %st(0)
+            // | Left | <- %st(0)
             // +-----+
             // 
             state.CGenPopFloat(stack_size);
@@ -251,9 +252,7 @@ namespace AST
 
         public Reg CGenDouble(Env env, CGenState state)
         {
-            Reg ret;
-
-            // 1. Load lhs to ST0. Now the float stack should only contain one element.
+            // 1. Load Left to ST0. Now the float stack should only contain one element.
             //
             // memory stack:
             // +-----+
@@ -263,10 +262,10 @@ namespace AST
             //
             // float stack:
             // +-----+
-            // | lhs | <- %st(0)
+            // | Left | <- %st(0)
             // +-----+
             // 
-            ret = lhs.CGenValue(env, state);
+            var ret = this.Left.CGenValue(env, state);
             if (ret != Reg.ST0)
             {
                 throw new InvalidOperationException();
@@ -278,7 +277,7 @@ namespace AST
             // +-----+
             // |     |
             // | ... |
-            // | lhs | <- %esp has decreased by 8
+            // | Left | <- %esp has decreased by 8
             // +-----+
             //
             // float stack:
@@ -286,27 +285,27 @@ namespace AST
             // 
             Int32 stack_size = state.CGenPushDoubleP();
 
-            // 3. Load rhs to ST0. Now the float stack should only contain one element.
+            // 3. Load Right to ST0. Now the float stack should only contain one element.
             //
             // memory stack:
             // +-----+
             // |     |
             // | ... |
-            // | lhs | <- %esp
+            // | Left | <- %esp
             // +-----+
             //
             // float stack:
             // +-----+
-            // | rhs | <- %st(0)
+            // | Right | <- %st(0)
             // +-----+
             // 
-            ret = rhs.CGenValue(env, state);
+            ret = this.Right.CGenValue(env, state);
             if (ret != Reg.ST0)
             {
                 throw new InvalidOperationException();
             }
 
-            // 4. Pop double from memory stack, push into float stack. Now both lhs and rhs are in float stack.
+            // 4. Pop double from memory stack, push into float stack. Now both Left and Right are in float stack.
             //
             // memory stack:
             // +-----+
@@ -316,9 +315,9 @@ namespace AST
             //
             // float stack:
             // +-----+
-            // | rhs | <- %st(1)
+            // | Right | <- %st(1)
             // +-----+
-            // | lhs | <- %st(0)
+            // | Left | <- %st(0)
             // +-----+
             // 
             state.CGenPopDouble(stack_size);
@@ -343,17 +342,17 @@ namespace AST
 
         public override sealed Reg CGenValue(Env env, CGenState state)
         {
-            switch (type.kind)
+            switch (this.Type.kind)
             {
                 case ExprType.Kind.FLOAT:
-                    if (lhs.type.kind != ExprType.Kind.FLOAT || rhs.type.kind != ExprType.Kind.FLOAT)
+                    if (this.Left.Type.kind != ExprType.Kind.FLOAT || this.Right.Type.kind != ExprType.Kind.FLOAT)
                     {
                         throw new InvalidOperationException();
                     }
                     return CGenFloat(env, state);
 
                 case ExprType.Kind.DOUBLE:
-                    if (lhs.type.kind != ExprType.Kind.DOUBLE || rhs.type.kind != ExprType.Kind.DOUBLE)
+                    if (this.Left.Type.kind != ExprType.Kind.DOUBLE || this.Right.Type.kind != ExprType.Kind.DOUBLE)
                     {
                         throw new InvalidOperationException();
                     }
@@ -377,13 +376,13 @@ namespace AST
     /// </summary>
     public class Multiply : BinaryArithmeticOp
     {
-        public Multiply(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type)
+        public Multiply(Expr left, Expr right, ExprType type)
+            : base(left, right, type)
         {
-            Debug.Assert((type.kind == ExprType.Kind.LONG && lhs.type.kind == ExprType.Kind.LONG && rhs.type.kind == ExprType.Kind.LONG)
-                        || (type.kind == ExprType.Kind.ULONG && lhs.type.kind == ExprType.Kind.ULONG && rhs.type.kind == ExprType.Kind.ULONG)
-                        || (type.kind == ExprType.Kind.FLOAT && lhs.type.kind == ExprType.Kind.FLOAT && rhs.type.kind == ExprType.Kind.FLOAT)
-                        || (type.kind == ExprType.Kind.DOUBLE && lhs.type.kind == ExprType.Kind.DOUBLE && rhs.type.kind == ExprType.Kind.DOUBLE));
+            Debug.Assert((type.kind == ExprType.Kind.LONG && left.Type.kind == ExprType.Kind.LONG && right.Type.kind == ExprType.Kind.LONG)
+                        || (type.kind == ExprType.Kind.ULONG && left.Type.kind == ExprType.Kind.ULONG && right.Type.kind == ExprType.Kind.ULONG)
+                        || (type.kind == ExprType.Kind.FLOAT && left.Type.kind == ExprType.Kind.FLOAT && right.Type.kind == ExprType.Kind.FLOAT)
+                        || (type.kind == ExprType.Kind.DOUBLE && left.Type.kind == ExprType.Kind.DOUBLE && right.Type.kind == ExprType.Kind.DOUBLE));
         }
 
         public override void OperateLong(CGenState state) => state.IMUL(Reg.EBX);
@@ -405,8 +404,8 @@ namespace AST
     /// </summary>
     public class Divide : BinaryArithmeticOp
     {
-        public Divide(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public Divide(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void OperateLong(CGenState state)
         {
@@ -431,8 +430,8 @@ namespace AST
     /// </summary>
     public class Modulo : BinaryIntegralOp
     {
-        public Modulo(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type)
+        public Modulo(Expr left, Expr right, ExprType type)
+            : base(left, right, type)
         {
         }
 
@@ -462,8 +461,8 @@ namespace AST
     /// </summary>
     public class Xor : BinaryIntegralOp
     {
-        public Xor(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public Xor(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void OperateLong(CGenState state) => state.XORL(Reg.EBX, Reg.EAX);
         public override void OperateULong(CGenState state) => state.XORL(Reg.EBX, Reg.EAX);
@@ -480,8 +479,8 @@ namespace AST
     /// </summary>
     public class BitwiseOr : BinaryIntegralOp
     {
-        public BitwiseOr(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public BitwiseOr(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void OperateLong(CGenState state) => state.ORL(Reg.EBX, Reg.EAX);
         public override void OperateULong(CGenState state) => state.ORL(Reg.EBX, Reg.EAX);
@@ -498,8 +497,8 @@ namespace AST
     /// </summary>
     public class BitwiseAnd : BinaryIntegralOp
     {
-        public BitwiseAnd(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public BitwiseAnd(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void OperateLong(CGenState state) => state.ANDL(Reg.EBX, Reg.EAX);
         public override void OperateULong(CGenState state) => state.ANDL(Reg.EBX, Reg.EAX);
@@ -510,13 +509,13 @@ namespace AST
     /// Append 0's on the right.
     /// 
     /// After semantic analysis, only two cases are possible:
-    /// 1) long << long
-    /// 2) ulong << ulong
+    /// 1) long %lt;%lt; long
+    /// 2) ulong %lt;%lt; ulong
     /// </summary>
     public class LShift : BinaryIntegralOp
     {
-        public LShift(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public LShift(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void OperateLong(CGenState state) => state.SALL(Reg.EBX, Reg.EAX);
         public override void OperateULong(CGenState state) => state.SALL(Reg.EBX, Reg.EAX);
@@ -531,8 +530,8 @@ namespace AST
     /// </summary>
     public class RShift : BinaryIntegralOp
     {
-        public RShift(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public RShift(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void OperateLong(CGenState state) => state.SARL(Reg.EBX, Reg.EAX);
         public override void OperateULong(CGenState state) => state.SHRL(Reg.EBX, Reg.EAX);
@@ -552,8 +551,8 @@ namespace AST
     /// </summary>
     public class Add : BinaryArithmeticOp
     {
-        public Add(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public Add(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void OperateLong(CGenState state) => state.ADDL(Reg.EBX, Reg.EAX);
         public override void OperateULong(CGenState state) => state.ADDL(Reg.EBX, Reg.EAX);
@@ -575,8 +574,8 @@ namespace AST
     /// </summary>
     public class Sub : BinaryArithmeticOp
     {
-        public Sub(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public Sub(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void OperateLong(CGenState state) => state.SUBL(Reg.EBX, Reg.EAX);
         public override void OperateULong(CGenState state) => state.SUBL(Reg.EBX, Reg.EAX);
@@ -597,8 +596,8 @@ namespace AST
     /// </summary>
     public abstract class BinaryArithmeticComp : BinaryArithmeticOp
     {
-        public BinaryArithmeticComp(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public BinaryArithmeticComp(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public abstract void SetLong(CGenState state);
         public abstract void SetULong(CGenState state);
@@ -621,13 +620,13 @@ namespace AST
 
         public override void OperateFloat(CGenState state)
         {
-            // In the beginning, %st(0) = lhs, %st(1) = rhs.
+            // In the beginning, %st(0) = Left, %st(1) = Right.
             // 
             // float stack:
             // +-----+
-            // | rhs | <- %st(1)
+            // | Right | <- %st(1)
             // +-----+
-            // | lhs | <- %st(0)
+            // | Left | <- %st(0)
             // +-----+
             // 
 
@@ -636,7 +635,7 @@ namespace AST
             // 
             // float stack:
             // +-----+
-            // | rhs | <- %st(0)
+            // | Right | <- %st(0)
             // +-----+
             // 
             state.FUCOMIP();
@@ -655,13 +654,13 @@ namespace AST
 
         public override void OperateDouble(CGenState state)
         {
-            // In the beginning, %st(0) = lhs, %st(1) = rhs.
+            // In the beginning, %st(0) = Left, %st(1) = Right.
             // 
             // float stack:
             // +-----+
-            // | rhs | <- %st(1)
+            // | Right | <- %st(1)
             // +-----+
-            // | lhs | <- %st(0)
+            // | Left | <- %st(0)
             // +-----+
             // 
 
@@ -670,7 +669,7 @@ namespace AST
             // 
             // float stack:
             // +-----+
-            // | rhs | <- %st(0)
+            // | Right | <- %st(0)
             // +-----+
             // 
             state.FUCOMIP();
@@ -704,8 +703,8 @@ namespace AST
     /// </summary>
     public class GEqual : BinaryArithmeticComp
     {
-        public GEqual(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public GEqual(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void SetLong(CGenState state) => state.SETGE(Reg.AL);
         public override void SetULong(CGenState state) => state.SETNB(Reg.AL);
@@ -728,8 +727,8 @@ namespace AST
     /// </summary>
     public class Greater : BinaryArithmeticComp
     {
-        public Greater(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public Greater(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void SetLong(CGenState state) => state.SETG(Reg.AL);
         public override void SetULong(CGenState state) => state.SETA(Reg.AL);
@@ -743,17 +742,17 @@ namespace AST
     /// 
     /// After semantic analysis, pointer comparisons are converted into
     ///   integer comparisons. So in AST, only four cases are possible:
-    /// 1) long <= long
-    /// 2) ulong <= ulong
-    /// 3) float <= float
-    /// 4) double <= double
+    /// 1) long %lt;= long
+    /// 2) ulong %lt;= ulong
+    /// 3) float %lt;= float
+    /// 4) double %lt;= double
     /// 
     /// http://x86.renejeschke.de/html/file_module_x86_id_288.html
     /// </summary>
     public class LEqual : BinaryArithmeticComp
     {
-        public LEqual(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public LEqual(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void SetLong(CGenState state) => state.SETLE(Reg.AL);
         public override void SetULong(CGenState state) => state.SETNA(Reg.AL);
@@ -767,17 +766,17 @@ namespace AST
     /// 
     /// After semantic analysis, pointer comparisons are converted into
     ///   integer comparisons. So in AST, only four cases are possible:
-    /// 1) long < long
-    /// 2) ulong < ulong
-    /// 3) float < float
-    /// 4) double < double
+    /// 1) long %lt; long
+    /// 2) ulong %lt; ulong
+    /// 3) float %lt; float
+    /// 4) double %lt; double
     /// 
     /// http://x86.renejeschke.de/html/file_module_x86_id_288.html
     /// </summary>
     public class Less : BinaryArithmeticComp
     {
-        public Less(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public Less(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void SetLong(CGenState state) => state.SETL(Reg.AL);
         public override void SetULong(CGenState state) => state.SETB(Reg.AL);
@@ -801,8 +800,8 @@ namespace AST
     /// </summary>
     public class Equal : BinaryArithmeticComp
     {
-        public Equal(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public Equal(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void SetLong(CGenState state) => state.SETE(Reg.AL);
         public override void SetULong(CGenState state) => state.SETE(Reg.AL);
@@ -826,8 +825,8 @@ namespace AST
     /// </summary>
     public class NotEqual : BinaryArithmeticComp
     {
-        public NotEqual(Expr lhs, Expr rhs, ExprType type)
-            : base(lhs, rhs, type) { }
+        public NotEqual(Expr left, Expr right, ExprType type)
+            : base(left, right, type) { }
 
         public override void SetLong(CGenState state) => state.SETNE(Reg.AL);
         public override void SetULong(CGenState state) => state.SETNE(Reg.AL);
@@ -837,28 +836,28 @@ namespace AST
 
 
     /// <summary>
-    /// lhs && rhs: can only take scalars (to compare with 0).
+    /// Left && Right: can only take scalars (to compare with 0).
     /// 
     /// After semantic analysis, each operand can only be
     /// long, ulong, float, double.
     /// Pointers are casted to ulongs.
     /// 
-    /// if lhs == 0:
+    /// if Left == 0:
     ///     return 0
     /// else:
-    ///     return rhs != 0
+    ///     return Right != 0
     /// 
     /// Generate the assembly in this fashion,
     /// then every route would only have one jump.
     /// 
     ///        +---------+   0
-    ///        | cmp lhs |-------+
+    ///        | cmp Left |-------+
     ///        +---------+       |
     ///             |            |
     ///             | 1          |
     ///             |            |
     ///        +----+----+   0   |
-    ///        | cmp rhs |-------+
+    ///        | cmp Right |-------+
     ///        +---------+       |
     ///             |            |
     ///             | 1          |
@@ -889,6 +888,7 @@ namespace AST
         }
         public readonly Expr lhs;
         public readonly Expr rhs;
+        public override Env Env => this.rhs.Env;
 
         public override Reg CGenValue(Env env, CGenState state)
         {
@@ -897,7 +897,7 @@ namespace AST
             Int32 label_finish = state.label_idx;
             state.label_idx++;
 
-            Reg ret = lhs.CGenValue(env, state);
+            Reg ret = this.lhs.CGenValue(env, state);
             switch (ret)
             {
                 case Reg.EAX:
@@ -916,7 +916,7 @@ namespace AST
                     throw new InvalidProgramException();
             }
 
-            ret = rhs.CGenValue(env, state);
+            ret = this.rhs.CGenValue(env, state);
             switch (ret)
             {
                 case Reg.EAX:
@@ -950,16 +950,16 @@ namespace AST
     }
 
     /// <summary>
-    /// lhs || rhs: can only take scalars (to compare with 0).
+    /// Left || Right: can only take scalars (to compare with 0).
     /// 
     /// After semantic analysis, each operand can only be
     /// long, ulong, float, double.
     /// Pointers are casted to ulongs.
     /// 
-    /// if lhs != 0:
+    /// if Left != 0:
     ///     return 1
     /// else:
-    ///     return rhs != 0
+    ///     return Right != 0
     /// 
     /// Generate the assembly in this fashion,
     /// then every route would only have one jump.
@@ -997,12 +997,13 @@ namespace AST
         public LogicalOr(Expr _lhs, Expr _rhs, ExprType _type)
             : base(_type)
         {
-            lhs = _lhs;
-            rhs = _rhs;
+            this.lhs = _lhs;
+            this.rhs = _rhs;
         }
 
         public readonly Expr lhs;
         public readonly Expr rhs;
+        public override Env Env => this.rhs.Env;
 
         public override Reg CGenValue(Env env, CGenState state)
         {
@@ -1011,7 +1012,7 @@ namespace AST
             Int32 label_finish = state.label_idx;
             state.label_idx++;
 
-            Reg ret = lhs.CGenValue(env, state);
+            Reg ret = this.lhs.CGenValue(env, state);
             switch (ret)
             {
                 case Reg.EAX:
@@ -1030,7 +1031,7 @@ namespace AST
                     throw new InvalidProgramException();
             }
 
-            ret = rhs.CGenValue(env, state);
+            ret = this.rhs.CGenValue(env, state);
             switch (ret)
             {
                 case Reg.EAX:

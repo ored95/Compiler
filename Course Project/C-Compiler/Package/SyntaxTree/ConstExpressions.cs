@@ -1,7 +1,9 @@
 ﻿using System;
+using LexicalAnalysis;
 
 namespace SyntaxTree
 {
+
     public abstract class Constant : Expr { }
 
     /// <summary>
@@ -9,23 +11,23 @@ namespace SyntaxTree
     /// </summary>
     public class ConstFloat : Constant
     {
-        public ConstFloat(Double value, TokenFloat.Suffix suffix)
+        public ConstFloat(Double value, TokenFloat.FloatSuffix floatSuffix)
         {
-            this.value = value;
-            this.suffix = suffix;
+            this.Value = value;
+            this.FloatSuffix = floatSuffix;
         }
-        public readonly TokenFloat.Suffix suffix;
-        public readonly Double value;
+        public TokenFloat.FloatSuffix FloatSuffix { get; }
+        public Double Value { get; }
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            switch (suffix)
+            switch (this.FloatSuffix)
             {
-                case TokenFloat.Suffix.F:
-                    return new AST.ConstFloat((Single)value);
-                case TokenFloat.Suffix.NONE:
-                case TokenFloat.Suffix.L:
-                    return new AST.ConstDouble(value);
+                case TokenFloat.FloatSuffix.F:
+                    return new AST.ConstFloat((Single)this.Value, env);
+                case TokenFloat.FloatSuffix.NONE:
+                case TokenFloat.FloatSuffix.L:
+                    return new AST.ConstDouble(this.Value, env);
                 default:
                     throw new InvalidOperationException();
             }
@@ -38,24 +40,24 @@ namespace SyntaxTree
     /// </summary>
     public class ConstInt : Constant
     {
-        public ConstInt(Int64 value, TokenInt.Suffix suffix)
+        public ConstInt(Int64 value, TokenInt.IntSuffix suffix)
         {
-            this.value = value;
-            this.suffix = suffix;
+            this.Value = value;
+            this.Suffix = suffix;
         }
-        public readonly TokenInt.Suffix suffix;
-        public readonly Int64 value;
+        public TokenInt.IntSuffix Suffix { get; }
+        public Int64 Value { get; }
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            switch (suffix)
+            switch (this.Suffix)
             {
-                case TokenInt.Suffix.U:
-                case TokenInt.Suffix.UL:
-                    return new AST.ConstULong((UInt32)value);
-                case TokenInt.Suffix.NONE:
-                case TokenInt.Suffix.L:
-                    return new AST.ConstLong((Int32)value);
+                case TokenInt.IntSuffix.U:
+                case TokenInt.IntSuffix.UL:
+                    return new AST.ConstULong((UInt32)this.Value, env);
+                case TokenInt.IntSuffix.NONE:
+                case TokenInt.IntSuffix.L:
+                    return new AST.ConstLong((Int32)this.Value, env);
                 default:
                     throw new InvalidOperationException();
             }
@@ -69,13 +71,14 @@ namespace SyntaxTree
     {
         public StringLiteral(String value)
         {
-            this.value = value;
+            this.Value = value;
         }
-        public readonly String value;
+        public String Value { get; }
 
         public override AST.Expr GetExpr(AST.Env env)
         {
-            return new AST.ConstStringLiteral(value);
+            return new AST.ConstStringLiteral(this.Value, env);
         }
     }
+
 }

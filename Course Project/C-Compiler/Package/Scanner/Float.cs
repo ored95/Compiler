@@ -1,334 +1,337 @@
 ﻿using System;
 
-// TokenFloatConst
-// ===============
-// The token representing a floating number.
-// It can either be a float or double.
-// 
-public class TokenFloat : Token
+namespace LexicalAnalysis
 {
-    public enum Suffix
+    /// <summary>
+    /// The token representing a floating number.
+    /// It can either be a float or double.
+    /// </summary>
+    public sealed class TokenFloat : Token
     {
-        NONE,
-        F,
-        L
-    }
 
-    public TokenFloat(Double value, Suffix suffix, String source)
-        : base(TokenType.FLOAT)
-    {
-        this.value = value;
-        this.suffix = suffix;
-        this.source = source;
-    }
-
-    public readonly Double value;
-    public readonly String source;
-    public readonly Suffix suffix;
-
-    public override String ToString()
-    {
-        String str = type.ToString();
-        switch (suffix)
+        public enum FloatSuffix
         {
-            case Suffix.F:
-                str += "(float)";
-                break;
-            case Suffix.L:
-                str += "(long double)";
-                break;
-            default:
-                str += "(double)";
-                break;
+            NONE,
+            F,
+            L
         }
-        return str + ": " + value.ToString() + " \"" + source + "\"";
-    }
-}
 
-// FSAFloat
-// ========
-// The FSA for scanning a float.
-// 
-public class FSAFloat : FSA
-{
-    private enum State
-    {
-        START,
-        END,
-        ERROR,
-        D,
-        P,
-        DP,
-        PD,
-        DE,
-        DES,
-        DED,
-        PDF,
-        DPL
-    };
-
-    private String raw;
-    private Int64 int_part;
-    private Int64 frac_part;
-    private Int64 frac_count;
-    private Int64 exp_part;
-    private Boolean exp_pos;
-    private TokenFloat.Suffix suffix;
-    private State state;
-
-    public FSAFloat()
-    {
-        state = State.START;
-        int_part = 0;
-        frac_part = 0;
-        frac_count = 0;
-        exp_part = 0;
-        suffix = TokenFloat.Suffix.NONE;
-        exp_pos = true;
-        raw = "";
-    }
-
-    public override sealed void Reset()
-    {
-        state = State.START;
-        int_part = 0;
-        frac_part = 0;
-        frac_count = 0;
-        exp_part = 0;
-        suffix = TokenFloat.Suffix.NONE;
-        exp_pos = true;
-        raw = "";
-    }
-
-    public override sealed FSAStatus GetStatus()
-    {
-        switch (state)
+        public TokenFloat(Double value, FloatSuffix suffix, String source)
         {
-            case State.START:
-                return FSAStatus.NONE;
-            case State.END:
-                return FSAStatus.END;
-            case State.ERROR:
-                return FSAStatus.ERROR;
-            default:
-                return FSAStatus.RUNNING;
+            this.Value = value;
+            this.Suffix = suffix;
+            this.Source = source;
+        }
+
+        public override TokenKind Kind { get; } = TokenKind.FLOAT;
+        public Double Value { get; }
+        public String Source { get; }
+        public FloatSuffix Suffix { get; }
+
+        public override String ToString()
+        {
+            String str = this.Kind.ToString();
+            switch (this.Suffix)
+            {
+                case FloatSuffix.F:
+                    str += "(float)";
+                    break;
+                case FloatSuffix.L:
+                    str += "(long double)";
+                    break;
+                default:
+                    str += "(double)";
+                    break;
+            }
+            return str + ": " + this.Value + " \"" + this.Source + "\"";
         }
     }
 
-    public override sealed Token RetrieveToken()
+    /// <summary>
+    /// The FSA for scanning a float.
+    /// </summary>
+    public sealed class FSAFloat : FSA
     {
-        Double val;
-        if (exp_pos)
+        private enum State
         {
-            val = (int_part + frac_part * Math.Pow(0.1, frac_count)) * Math.Pow(10, exp_part);
+            START,
+            END,
+            ERROR,
+            D,
+            P,
+            DP,
+            PD,
+            DE,
+            DES,
+            DED,
+            PDF,
+            DPL
+        };
+
+        private String _raw;
+        private Int64 _intPart;
+        private Int64 _fracPart;
+        private Int64 _fracCount;
+        private Int64 _expPart;
+        private Boolean _expPos;
+        private TokenFloat.FloatSuffix _suffix;
+        private State _state;
+
+        public FSAFloat()
+        {
+            this._state = State.START;
+            this._intPart = 0;
+            this._fracPart = 0;
+            this._fracCount = 0;
+            this._expPart = 0;
+            this._suffix = TokenFloat.FloatSuffix.NONE;
+            this._expPos = true;
+            this._raw = "";
         }
-        else
+
+        public override void Reset()
         {
-            val = (int_part + frac_part * Math.Pow(0.1, frac_count)) * Math.Pow(10, -exp_part);
+            this._state = State.START;
+            this._intPart = 0;
+            this._fracPart = 0;
+            this._fracCount = 0;
+            this._expPart = 0;
+            this._suffix = TokenFloat.FloatSuffix.NONE;
+            this._expPos = true;
+            this._raw = "";
         }
-        return new TokenFloat(val, suffix, raw.Substring(0, raw.Length - 1));
-    }
 
-    public override sealed void ReadChar(Char ch)
-    {
-        raw += ch;
-        switch (state)
+        public override FSAStatus GetStatus()
         {
-            case State.ERROR:
-            case State.END:
-                state = State.ERROR;
-                break;
+            switch (this._state)
+            {
+                case State.START:
+                    return FSAStatus.NONE;
+                case State.END:
+                    return FSAStatus.END;
+                case State.ERROR:
+                    return FSAStatus.ERROR;
+                default:
+                    return FSAStatus.RUNNING;
+            }
+        }
 
-            case State.START:
-                if (Char.IsDigit(ch))
-                {
-                    int_part = ch - '0';
-                    state = State.D;
-                }
-                else if (ch == '.')
-                {
-                    state = State.P;
-                }
-                else
-                {
-                    state = State.ERROR;
-                }
-                break;
+        public override Token RetrieveToken()
+        {
+            Double val;
+            if (this._expPos)
+            {
+                val = (this._intPart + this._fracPart * Math.Pow(0.1, this._fracCount)) * Math.Pow(10, this._expPart);
+            }
+            else
+            {
+                val = (this._intPart + this._fracPart * Math.Pow(0.1, this._fracCount)) * Math.Pow(10, -this._expPart);
+            }
+            return new TokenFloat(val, this._suffix, this._raw.Substring(0, this._raw.Length - 1));
+        }
 
-            case State.D:
-                if (Char.IsDigit(ch))
-                {
-                    int_part *= 10;
-                    int_part += ch - '0';
-                    state = State.D;
-                }
-                else if (ch == 'e' || ch == 'E')
-                {
-                    state = State.DE;
-                }
-                else if (ch == '.')
-                {
-                    state = State.DP;
-                }
-                else
-                {
-                    state = State.ERROR;
-                }
-                break;
+        public override void ReadChar(Char ch)
+        {
+            this._raw += ch;
+            switch (this._state)
+            {
+                case State.ERROR:
+                case State.END:
+                    this._state = State.ERROR;
+                    break;
 
-            case State.P:
-                if (Char.IsDigit(ch))
-                {
-                    frac_part = ch - '0';
-                    frac_count = 1;
-                    state = State.PD;
-                }
-                else
-                {
-                    state = State.ERROR;
-                }
-                break;
-
-            case State.DP:
-                if (Char.IsDigit(ch))
-                {
-                    frac_part = ch - '0';
-                    frac_count = 1;
-                    state = State.PD;
-                }
-                else if (ch == 'e' || ch == 'E')
-                {
-                    state = State.DE;
-                }
-                else if (ch == 'f' || ch == 'F')
-                {
-                    suffix = TokenFloat.Suffix.F;
-                    state = State.PDF;
-                }
-                else if (ch == 'l' || ch == 'L')
-                {
-                    suffix = TokenFloat.Suffix.L;
-                    state = State.DPL;
-                }
-                else
-                {
-                    state = State.END;
-                }
-                break;
-
-            case State.PD:
-                if (Char.IsDigit(ch))
-                {
-                    frac_part *= 10;
-                    frac_part += ch - '0';
-                    frac_count++;
-                    state = State.PD;
-                }
-                else if (ch == 'e' || ch == 'E')
-                {
-                    state = State.DE;
-                }
-                else if (ch == 'f' || ch == 'F')
-                {
-                    suffix = TokenFloat.Suffix.F;
-                    state = State.PDF;
-                }
-                else if (ch == 'l' || ch == 'L')
-                {
-                    suffix = TokenFloat.Suffix.L;
-                    state = State.DPL;
-                }
-                else
-                {
-                    state = State.END;
-                }
-                break;
-
-            case State.DE:
-                if (Char.IsDigit(ch))
-                {
-                    exp_part = ch - '0';
-                    state = State.DED;
-                }
-                else if (ch == '+' || ch == '-')
-                {
-                    if (ch == '-')
+                case State.START:
+                    if (Char.IsDigit(ch))
                     {
-                        exp_pos = false;
+                        this._intPart = ch - '0';
+                        this._state = State.D;
                     }
-                    state = State.DES;
-                }
-                else
-                {
-                    state = State.ERROR;
-                }
-                break;
+                    else if (ch == '.')
+                    {
+                        this._state = State.P;
+                    }
+                    else
+                    {
+                        this._state = State.ERROR;
+                    }
+                    break;
 
-            case State.DES:
-                if (Char.IsDigit(ch))
-                {
-                    exp_part = ch - '0';
-                    state = State.DED;
-                }
-                else
-                {
-                    state = State.ERROR;
-                }
-                break;
+                case State.D:
+                    if (Char.IsDigit(ch))
+                    {
+                        this._intPart *= 10;
+                        this._intPart += ch - '0';
+                        this._state = State.D;
+                    }
+                    else if (ch == 'e' || ch == 'E')
+                    {
+                        this._state = State.DE;
+                    }
+                    else if (ch == '.')
+                    {
+                        this._state = State.DP;
+                    }
+                    else
+                    {
+                        this._state = State.ERROR;
+                    }
+                    break;
 
-            case State.DPL:
-                suffix = TokenFloat.Suffix.L;
-                state = State.END;
-                break;
+                case State.P:
+                    if (Char.IsDigit(ch))
+                    {
+                        this._fracPart = ch - '0';
+                        this._fracCount = 1;
+                        this._state = State.PD;
+                    }
+                    else
+                    {
+                        this._state = State.ERROR;
+                    }
+                    break;
 
-            case State.DED:
-                if (Char.IsDigit(ch))
-                {
-                    exp_part *= 10;
-                    exp_part += ch - '0';
-                    state = State.DED;
-                }
-                else if (ch == 'f' || ch == 'F')
-                {
-                    suffix = TokenFloat.Suffix.F;
-                    state = State.PDF;
-                }
-                else if (ch == 'l' || ch == 'L')
-                {
-                    suffix = TokenFloat.Suffix.L;
-                    state = State.DPL;
-                }
-                else
-                {
-                    state = State.END;
-                }
-                break;
+                case State.DP:
+                    if (Char.IsDigit(ch))
+                    {
+                        this._fracPart = ch - '0';
+                        this._fracCount = 1;
+                        this._state = State.PD;
+                    }
+                    else if (ch == 'e' || ch == 'E')
+                    {
+                        this._state = State.DE;
+                    }
+                    else if (ch == 'f' || ch == 'F')
+                    {
+                        this._suffix = TokenFloat.FloatSuffix.F;
+                        this._state = State.PDF;
+                    }
+                    else if (ch == 'l' || ch == 'L')
+                    {
+                        this._suffix = TokenFloat.FloatSuffix.L;
+                        this._state = State.DPL;
+                    }
+                    else
+                    {
+                        this._state = State.END;
+                    }
+                    break;
 
-            case State.PDF:
-                state = State.END;
-                break;
+                case State.PD:
+                    if (Char.IsDigit(ch))
+                    {
+                        this._fracPart *= 10;
+                        this._fracPart += ch - '0';
+                        this._fracCount++;
+                        this._state = State.PD;
+                    }
+                    else if (ch == 'e' || ch == 'E')
+                    {
+                        this._state = State.DE;
+                    }
+                    else if (ch == 'f' || ch == 'F')
+                    {
+                        this._suffix = TokenFloat.FloatSuffix.F;
+                        this._state = State.PDF;
+                    }
+                    else if (ch == 'l' || ch == 'L')
+                    {
+                        this._suffix = TokenFloat.FloatSuffix.L;
+                        this._state = State.DPL;
+                    }
+                    else
+                    {
+                        this._state = State.END;
+                    }
+                    break;
 
-            default:
-                state = State.ERROR;
-                break;
+                case State.DE:
+                    if (Char.IsDigit(ch))
+                    {
+                        this._expPart = ch - '0';
+                        this._state = State.DED;
+                    }
+                    else if (ch == '+' || ch == '-')
+                    {
+                        if (ch == '-')
+                        {
+                            this._expPos = false;
+                        }
+                        this._state = State.DES;
+                    }
+                    else
+                    {
+                        this._state = State.ERROR;
+                    }
+                    break;
+
+                case State.DES:
+                    if (Char.IsDigit(ch))
+                    {
+                        this._expPart = ch - '0';
+                        this._state = State.DED;
+                    }
+                    else
+                    {
+                        this._state = State.ERROR;
+                    }
+                    break;
+
+                case State.DPL:
+                    this._suffix = TokenFloat.FloatSuffix.L;
+                    this._state = State.END;
+                    break;
+
+                case State.DED:
+                    if (Char.IsDigit(ch))
+                    {
+                        this._expPart *= 10;
+                        this._expPart += ch - '0';
+                        this._state = State.DED;
+                    }
+                    else if (ch == 'f' || ch == 'F')
+                    {
+                        this._suffix = TokenFloat.FloatSuffix.F;
+                        this._state = State.PDF;
+                    }
+                    else if (ch == 'l' || ch == 'L')
+                    {
+                        this._suffix = TokenFloat.FloatSuffix.L;
+                        this._state = State.DPL;
+                    }
+                    else
+                    {
+                        this._state = State.END;
+                    }
+                    break;
+
+                case State.PDF:
+                    this._state = State.END;
+                    break;
+
+                default:
+                    this._state = State.ERROR;
+                    break;
+            }
+
         }
 
-    }
-
-    public override sealed void ReadEOF()
-    {
-        switch (state)
+        public override void ReadEOF()
         {
-            case State.DP:
-            case State.PD:
-            case State.DED:
-            case State.PDF:
-            case State.DPL:
-                state = State.END;
-                break;
-            default:
-                state = State.ERROR;
-                break;
+            switch (this._state)
+            {
+                case State.DP:
+                case State.PD:
+                case State.DED:
+                case State.PDF:
+                case State.DPL:
+                    this._state = State.END;
+                    break;
+                default:
+                    this._state = State.ERROR;
+                    break;
+            }
         }
+
     }
 }

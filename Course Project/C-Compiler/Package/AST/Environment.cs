@@ -15,12 +15,11 @@ namespace AST
         // 
         public enum EntryKind
         {
-            NOT_FOUND,
             ENUM,
             TYPEDEF,
             STACK,
             FRAME,
-            GLOBAL,
+            GLOBAL
         }
 
 
@@ -60,12 +59,12 @@ namespace AST
                           List<Utils.StoreEntry> typedef_entries,
                           List<Utils.StoreEntry> enum_entries)
             {
-                locals = stack_entries;
-                esp_pos = stack_offset;
-                globals = global_entries;
-                func = curr_func;
-                typedefs = typedef_entries;
-                enums = enum_entries;
+                this.locals = stack_entries;
+                this.esp_pos = stack_offset;
+                this.globals = global_entries;
+                this.func = curr_func;
+                this.typedefs = typedef_entries;
+                this.enums = enum_entries;
             }
 
             // copy constructor
@@ -102,10 +101,8 @@ namespace AST
             // 
             public Scope InScope()
             {
-                return new Scope(new List<Utils.StoreEntry>(),
-                                 esp_pos,
-                                 new List<Utils.StoreEntry>(),
-                                 func,
+                return new Scope(new List<Utils.StoreEntry>(), this.esp_pos,
+                                 new List<Utils.StoreEntry>(), this.func,
                                  new List<Utils.StoreEntry>(),
                                  new List<Utils.StoreEntry>());
             }
@@ -158,13 +155,8 @@ namespace AST
             // set the current function
             public Scope SetCurrentFunction(TFunction type)
             {
-                return new Scope(
-                    locals,
-                    esp_pos,
-                    globals,
-                    type,
-                    typedefs,
-                    enums
+                return new Scope(this.locals, this.esp_pos, this.globals,
+                    type, this.typedefs, this.enums
                 );
             }
 
@@ -180,31 +172,31 @@ namespace AST
                 Utils.StoreEntry store_entry;
 
                 // search the enum entries
-                if ((store_entry = enums.FindLast(entry => entry.name == name)) != null)
+                if ((store_entry = this.enums.FindLast(entry => entry.name == name)) != null)
                 {
                     return new Entry(EntryKind.ENUM, store_entry.type, store_entry.offset);
                 }
 
                 // search the typedef entries
-                if ((store_entry = typedefs.FindLast(entry => entry.name == name)) != null)
+                if ((store_entry = this.typedefs.FindLast(entry => entry.name == name)) != null)
                 {
                     return new Entry(EntryKind.TYPEDEF, store_entry.type, store_entry.offset);
                 }
 
                 // search the stack entries
-                if ((store_entry = locals.FindLast(entry => entry.name == name)) != null)
+                if ((store_entry = this.locals.FindLast(entry => entry.name == name)) != null)
                 {
                     return new Entry(EntryKind.STACK, store_entry.type, store_entry.offset);
                 }
 
                 // search the function arguments
-                if ((store_entry = func.args.FindLast(entry => entry.name == name)) != null)
+                if ((store_entry = this.func.args.FindLast(entry => entry.name == name)) != null)
                 {
                     return new Entry(EntryKind.FRAME, store_entry.type, store_entry.offset);
                 }
 
                 // search the global entries
-                if ((store_entry = globals.FindLast(entry => entry.name == name)) != null)
+                if ((store_entry = this.globals.FindLast(entry => entry.name == name)) != null)
                 {
                     return new Entry(EntryKind.GLOBAL, store_entry.type, store_entry.offset);
                 }
@@ -228,27 +220,27 @@ namespace AST
                 }
 
                 String str = "";
-                foreach (Utils.StoreEntry entry in func.args)
+                foreach (Utils.StoreEntry entry in this.func.args)
                 {
                     str += indent;
-                    str += "[%ebp + " + entry.offset + "] " + entry.name + " : " + entry.type.ToString() + "\n";
+                    str += "[%ebp + " + entry.offset + "] " + entry.name + " : " + entry.type + "\n";
                 }
-                foreach (Utils.StoreEntry entry in globals)
+                foreach (Utils.StoreEntry entry in this.globals)
                 {
                     str += indent;
-                    str += "[extern] " + entry.name + " : " + entry.type.ToString() + "\n";
+                    str += "[extern] " + entry.name + " : " + entry.type + "\n";
                 }
-                foreach (Utils.StoreEntry entry in locals)
+                foreach (Utils.StoreEntry entry in this.locals)
                 {
                     str += indent;
-                    str += "[%ebp - " + entry.offset + "] " + entry.name + " : " + entry.type.ToString() + "\n";
+                    str += "[%ebp - " + entry.offset + "] " + entry.name + " : " + entry.type + "\n";
                 }
-                foreach (Utils.StoreEntry entry in typedefs)
+                foreach (Utils.StoreEntry entry in this.typedefs)
                 {
                     str += indent;
-                    str += "typedef: " + entry.name + " <- " + entry.type.ToString() + "\n";
+                    str += "typedef: " + entry.name + " <- " + entry.type + "\n";
                 }
-                foreach (Utils.StoreEntry entry in enums)
+                foreach (Utils.StoreEntry entry in this.enums)
                 {
                     str += indent;
                     str += entry.name + " = " + entry.offset + "\n";
@@ -275,8 +267,8 @@ namespace AST
         // construct an environment with a single empty scope
         public Env()
         {
-            env_scopes = new Stack<Scope>();
-            env_scopes.Push(new Scope());
+            this.env_scopes = new Stack<Scope>();
+            this.env_scopes.Push(new Scope());
         }
 
         // Environment
@@ -285,7 +277,7 @@ namespace AST
         // 
         private Env(Stack<Scope> scopes)
         {
-            env_scopes = scopes;
+            this.env_scopes = scopes;
         }
 
         // InScope
@@ -296,7 +288,7 @@ namespace AST
         // 
         public Env InScope()
         {
-            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(env_scopes));
+            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(this.env_scopes));
             scopes.Push(scopes.Peek().InScope());
             return new Env(scopes);
         }
@@ -309,7 +301,7 @@ namespace AST
         // 
         public Env OutScope()
         {
-            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(env_scopes));
+            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(this.env_scopes));
             scopes.Pop();
             return new Env(scopes);
         }
@@ -323,7 +315,7 @@ namespace AST
         public Env PushEntry(EntryKind loc, String name, ExprType type)
         {
             // note the nested copy constructor. this is because the constructor would reverse the elements.
-            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(env_scopes));
+            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(this.env_scopes));
             Scope top = scopes.Pop().PushEntry(loc, name, type);
             scopes.Push(top);
             return new Env(scopes);
@@ -337,7 +329,7 @@ namespace AST
         // 
         public Env PushEnum(String name, ExprType type, Int32 value)
         {
-            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(env_scopes));
+            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(this.env_scopes));
             Scope top = scopes.Pop().PushEnum(name, type, value);
             scopes.Push(top);
             return new Env(scopes);
@@ -351,7 +343,7 @@ namespace AST
         // 
         public Env SetCurrentFunction(TFunction type)
         {
-            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(env_scopes));
+            Stack<Scope> scopes = new Stack<Scope>(new Stack<Scope>(this.env_scopes));
             Scope top = scopes.Pop().SetCurrentFunction(type);
             scopes.Push(top);
             return new Env(scopes);
@@ -365,7 +357,7 @@ namespace AST
         // 
         public TFunction GetCurrentFunction()
         {
-            return env_scopes.Peek().func;
+            return this.env_scopes.Peek().func;
         }
 
         // GetStackOffset
@@ -374,42 +366,41 @@ namespace AST
         // output: Int32
         // return the current stack size
         // 
-        public Int32 StackSize
-        {
-            get
-            {
-                return -env_scopes.Peek().esp_pos;
-            }
-        }
+        public Int32 StackSize => -this.env_scopes.Peek().esp_pos;
 
-        public Entry Find(String name)
+        public Option<Entry> Find(String name)
         {
             Entry entry = null;
-            foreach (Scope scope in env_scopes)
+            foreach (Scope scope in this.env_scopes)
             {
                 if ((entry = scope.Find(name)) != null)
                 {
-                    return entry;
+                    return new Some<Entry>(entry);
                 }
             }
-            return new Entry(EntryKind.NOT_FOUND, new TVoid(), 0);
+            return new None<Entry>();
         }
 
-        public Entry FindInCurrentScope(String name)
+        public Option<Entry> FindInCurrentScope(String name)
         {
-            return env_scopes.Peek().Find(name);
+            var entry = this.env_scopes.Peek().Find(name);
+            if (entry == null)
+            {
+                return Option<Entry>.None;
+            }
+            return Option.Some(entry);
         }
 
         public Boolean IsGlobal()
         {
-            return env_scopes.Count == 1;
+            return this.env_scopes.Count == 1;
         }
 
         public String Dump()
         {
             String str = "";
             Int32 depth = 0;
-            foreach (Scope scope in env_scopes)
+            foreach (Scope scope in this.env_scopes)
             {
                 str += scope.Dump(depth, "  ");
                 depth++;
@@ -418,5 +409,6 @@ namespace AST
         }
 
         private readonly Stack<Scope> env_scopes;
+
     }
 }

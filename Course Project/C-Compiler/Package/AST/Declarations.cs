@@ -1,20 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using CodeGeneration;
 
 namespace AST
 {
-    public class Decln : ExternDecln
+    public enum StorageClass
     {
-        public enum SCS
-        {
-            AUTO,
-            STATIC,
-            EXTERN,
-            TYPEDEF,
-        }
+        AUTO,
+        STATIC,
+        EXTERN,
+        TYPEDEF
+    }
 
-        public Decln(String name, SCS scs, ExprType type, Option<Initr> initr)
+    public sealed class Decln : ExternDecln
+    {
+        public Decln(String name, StorageClass scs, ExprType type, Option<Initr> initr)
         {
             this.name = name;
             this.scs = scs;
@@ -24,57 +25,222 @@ namespace AST
 
         public override String ToString()
         {
-            String str = "[" + scs.ToString() + "] ";
-            str += name;
-            str += " : " + type.ToString();
+            String str = "[" + this.scs + "] ";
+            str += this.name;
+            str += " : " + this.type;
             return str;
         }
 
-        public void CGenExternDecln(Env env, CGenState state)
+        // * function;
+        // * extern function;
+        // * static function;
+        // * obj;
+        // * obj = init;
+        // * static obj;
+        // * static obj = init;
+        // * extern obj;
+        // * extern obj = init;
+        public void CGenDecln(Env env, CGenState state)
         {
-            state.CGenExpandStackTo(env.StackSize, ToString());
-            //if (initr.type.kind != ExprType.Kind.VOID) {
-            //    // need initialization
 
-            //    Env.Entry entry = env.Find(name);
-            //    switch (entry.kind) {
-            //    case Env.EntryKind.STACK:
-            //        // %eax = <decln_init>
-            //        initr.CGenValue(env, state);
-
-            //        // -<offset>(%ebp) = %eax
-            //        state.MOVL(Reg.EAX, -entry.offset, Reg.EBP);
-
-            //        break;
-            //    case Env.EntryKind.GLOBAL:
-            //        // TODO : extern decln global
-            //        break;
-            //    case Env.EntryKind.ENUM:
-            //    case Env.EntryKind.FRAME:
-            //    case Env.EntryKind.NOT_FOUND:
-            //    case Env.EntryKind.TYPEDEF:
-            //    default:
-            //        throw new NotImplementedException();
-            //    }
-
-
-            //}
-        }
-
-        public void What(ExprType type, Initr initr)
-        {
-            switch (type.kind)
+            if (env.IsGlobal())
             {
-                case ExprType.Kind.ARRAY:
-                    throw new NotImplementedException();
+
+                if (this.initr.IsSome)
+                {
+                    Initr initr = this.initr.Value;
+                    switch (this.scs)
+                    {
+                        case StorageClass.AUTO:
+                            state.GLOBL(this.name);
+                            break;
+
+                        case StorageClass.EXTERN:
+                            throw new InvalidProgramException();
+
+                        case StorageClass.STATIC:
+                            break;
+
+                        case StorageClass.TYPEDEF:
+                            // Ignore.
+                            return;
+
+                        default:
+                            throw new InvalidProgramException();
+                    }
+
+                    state.DATA();
+
+                    state.ALIGN(ExprType.ALIGN_LONG);
+
+                    state.CGenLabel(this.name);
+
+                    Int32 last = 0;
+                    initr.Iterate(this.type, (Int32 offset, Expr expr) => {
+                        if (offset > last)
+                        {
+                            state.ZERO(offset - last);
+                        }
+
+                        if (!expr.IsConstExpr)
+                        {
+                            throw new InvalidOperationException("Cannot initialize with non-const expression.");
+                        }
+
+                        switch (expr.Type.kind)
+                        {
+                            // TODO: without const char/short, how do I initialize?
+                            case ExprType.Kind.CHAR:
+                            case ExprType.Kind.UCHAR:
+                            case ExprType.Kind.SHORT:
+                            case ExprType.Kind.USHORT:
+                                throw new NotImplementedException();
+                            case ExprType.Kind.LONG:
+                                state.LONG(((ConstLong)expr).value);
+                                break;
+
+                            case ExprType.Kind.ULONG:
+                                state.LONG((Int32)((ConstULong)expr).value);
+                                break;
+
+                            case ExprType.Kind.POINTER:
+                                state.LONG((Int32)((ConstPtr)expr).value);
+                                break;
+
+                            case ExprType.Kind.FLOAT:
+                                byte[] float_bytes = BitConverter.GetBytes(((ConstFloat)expr).value);
+                                Int32 intval = BitConverter.ToInt32(float_bytes, 0);
+                                state.LONG(intval);
+                                break;
+
+                            case ExprType.Kind.DOUBLE:
+                                byte[] double_bytes = BitConverter.GetBytes(((ConstDouble)expr).value);
+                                Int32 first_int = BitConverter.ToInt32(double_bytes, 0);
+                                Int32 second_int = BitConverter.ToInt32(double_bytes, 4);
+                                state.LONG(first_int);
+                                state.LONG(second_int);
+                                break;
+
+                            default:
+                                throw new InvalidProgramException();
+                        }
+
+                        last = offset + expr.Type.SizeOf;
+                    });
+
+                }
+                else
+                {
+
+                    // Global without initialization.
+
+                    switch (this.scs)
+                    {
+                        case StorageClass.AUTO:
+                            // .comm name,size,align
+                            break;
+
+                        case StorageClass.EXTERN:
+                            break;
+
+                        case StorageClass.STATIC:
+                            // .local name
+                            // .comm name,size,align
+                            state.LOCAL(this.name);
+                            break;
+
+                        case StorageClass.TYPEDEF:
+                            // Ignore.
+                            return;
+
+                        default:
+                            throw new InvalidProgramException();
+                    }
+
+                    if (this.type.kind != ExprType.Kind.FUNCTION)
+                    {
+                        state.COMM(this.name, this.type.SizeOf, ExprType.ALIGN_LONG);
+                    }
+
+
+                }
+
+                state.NEWLINE();
+
             }
+            else
+            {
+                // stack object
+
+                state.CGenExpandStackTo(env.StackSize, ToString());
+
+                Int32 stack_size = env.StackSize;
+
+                // pos should be equal to stack_size, but whatever...
+                Int32 pos = env.Find(this.name).Value.offset;
+                if (this.initr.IsNone)
+                {
+                    return;
+                }
+
+                Initr initr = this.initr.Value;
+                initr.Iterate(this.type, (Int32 offset, Expr expr) => {
+                    Reg ret = expr.CGenValue(env, state);
+                    switch (expr.Type.kind)
+                    {
+                        case ExprType.Kind.CHAR:
+                        case ExprType.Kind.UCHAR:
+                            state.MOVB(Reg.EAX, pos + offset, Reg.EBP);
+                            break;
+
+                        case ExprType.Kind.SHORT:
+                        case ExprType.Kind.USHORT:
+                            state.MOVW(Reg.EAX, pos + offset, Reg.EBP);
+                            break;
+
+                        case ExprType.Kind.DOUBLE:
+                            state.FSTPL(pos + offset, Reg.EBP);
+                            break;
+
+                        case ExprType.Kind.FLOAT:
+                            state.FSTPS(pos + offset, Reg.EBP);
+                            break;
+
+                        case ExprType.Kind.LONG:
+                        case ExprType.Kind.ULONG:
+                        case ExprType.Kind.POINTER:
+                            state.MOVL(Reg.EAX, pos + offset, Reg.EBP);
+                            break;
+
+                        case ExprType.Kind.STRUCT_OR_UNION:
+                            state.MOVL(Reg.EAX, Reg.ESI);
+                            state.LEA(pos + offset, Reg.EBP, Reg.EDI);
+                            state.MOVL(expr.Type.SizeOf, Reg.ECX);
+                            state.CGenMemCpy();
+                            break;
+
+                        case ExprType.Kind.ARRAY:
+                        case ExprType.Kind.FUNCTION:
+                            throw new InvalidProgramException($"How could a {expr.Type.kind} be in a init list?");
+
+                        default:
+                            throw new InvalidProgramException();
+                    }
+
+                    state.CGenForceStackSizeTo(stack_size);
+
+                });
+
+            } // stack object
         }
 
         private readonly String name;
-        private readonly SCS scs;
+        private readonly StorageClass scs;
         private readonly ExprType type;
         private readonly Option<Initr> initr;
     }
+
+
 
     /// <summary>
     /// 1. Scalar: an expression, optionally enclosed in braces.
@@ -108,47 +274,54 @@ namespace AST
     /// </summary>
     public abstract class Initr
     {
-        public Initr(Kind kind)
-        {
-            this.kind = kind;
-        }
         public enum Kind
         {
             EXPR,
-            INIT_LIST,
+            INIT_LIST
         }
-        public readonly Kind kind;
+        public abstract Kind kind { get; }
 
         public abstract Initr ConformType(MemberIterator iter);
 
         public Initr ConformType(ExprType type) => ConformType(new MemberIterator(type));
 
+        public abstract void Iterate(MemberIterator iter, Action<Int32, Expr> action);
+
+        public void Iterate(ExprType type, Action<Int32, Expr> action) => Iterate(new MemberIterator(type), action);
     }
 
     public class InitExpr : Initr
     {
         public InitExpr(Expr expr)
-            : base(Kind.EXPR)
         {
             this.expr = expr;
         }
         public readonly Expr expr;
+        public override Kind kind => Kind.EXPR;
 
         public override Initr ConformType(MemberIterator iter)
         {
-            iter.Read(this.expr.type);
+            iter.Locate(this.expr.Type);
             Expr expr = TypeCast.MakeCast(this.expr, iter.CurType);
             return new InitExpr(expr);
+        }
+
+        public override void Iterate(MemberIterator iter, Action<Int32, Expr> action)
+        {
+            iter.Locate(this.expr.Type);
+            Int32 offset = iter.CurOffset;
+            Expr expr = this.expr;
+            action(offset, expr);
         }
     }
 
     public class InitList : Initr
     {
-        public InitList(List<Initr> initrs) :
-            base(Kind.INIT_LIST)
+        public InitList(List<Initr> initrs)
         {
             this.initrs = initrs;
         }
+        public override Kind kind => Kind.INIT_LIST;
         public readonly List<Initr> initrs;
 
         public override Initr ConformType(MemberIterator iter)
@@ -166,14 +339,27 @@ namespace AST
             iter.OutBrace();
             return new InitList(initrs);
         }
+
+        public override void Iterate(MemberIterator iter, Action<Int32, Expr> action)
+        {
+            iter.InBrace();
+            for (Int32 i = 0; i < this.initrs.Count; ++i)
+            {
+                this.initrs[i].Iterate(iter, action);
+                if (i != this.initrs.Count - 1)
+                {
+                    iter.Next();
+                }
+            }
+            iter.OutBrace();
+        }
     }
 
     public class MemberIterator
     {
         public MemberIterator(ExprType type)
         {
-            trace = new List<Status>();
-            trace.Add(new Status(type));
+            this.trace = new List<Status> { new Status(type) };
         }
 
         public class Status
@@ -181,59 +367,103 @@ namespace AST
             public Status(ExprType base_type)
             {
                 this.base_type = base_type;
-                indices = new List<Int32>();
+                this.indices = new List<Int32>();
             }
 
-            public ExprType CurType { get { return GetType(base_type, indices); } }
+            public ExprType CurType => GetType(this.base_type, this.indices);
 
-            public ExprType GetType(ExprType base_type, IReadOnlyList<Int32> indices)
+            public Int32 CurOffset => GetOffset(this.base_type, this.indices);
+
+            //public List<Tuple<ExprType, Int32>> GetPath(ExprType base_type, IReadOnlyList<Int32> indices) {
+            //    ExprType type = base_type;
+            //    List<Tuple<ExprType, Int32>> path = new List<Tuple<ExprType, int>>();
+            //    foreach (Int32 index in indices) {
+            //        switch (type.kind) {
+            //            case ExprType.Kind.ARRAY:
+            //                type = ((TArray)type).elem_type;
+            //                break;
+            //            case ExprType.Kind.INCOMPLETE_ARRAY:
+            //            case ExprType.Kind.STRUCT_OR_UNION:
+            //            default:
+            //                throw new InvalidProgramException("Not an aggregate type.");
+            //        }
+            //    }
+            //}
+
+            public static ExprType GetType(ExprType from_type, Int32 to_index)
             {
-                ExprType type = base_type;
-                foreach (Int32 index in indices)
+                switch (from_type.kind)
                 {
-                    switch (type.kind)
-                    {
-                        case ExprType.Kind.ARRAY:
-                            type = ((TArray)type).elem_type;
-                            break;
-                        case ExprType.Kind.STRUCT_OR_UNION:
-                            type = ((TStructOrUnion)type).Attribs[index].type;
-                            break;
-                        default:
-                            throw new InvalidOperationException("Not an aggregate type.");
-                    }
+                    case ExprType.Kind.ARRAY:
+                        return ((TArray)from_type).elem_type;
+
+                    case ExprType.Kind.INCOMPLETE_ARRAY:
+                        return ((TIncompleteArray)from_type).elem_type;
+
+                    case ExprType.Kind.STRUCT_OR_UNION:
+                        return ((TStructOrUnion)from_type).Attribs[to_index].type;
+
+                    default:
+                        throw new InvalidProgramException("Not an aggregate type.");
                 }
-                return type;
+            }
+
+            public static ExprType GetType(ExprType base_type, IReadOnlyList<Int32> indices) =>
+                indices.Aggregate(base_type, GetType);
+
+            public static Int32 GetOffset(ExprType from_type, Int32 to_index)
+            {
+                switch (from_type.kind)
+                {
+                    case ExprType.Kind.ARRAY:
+                        return to_index * ((TArray)from_type).elem_type.SizeOf;
+
+                    case ExprType.Kind.INCOMPLETE_ARRAY:
+                        return to_index * ((TIncompleteArray)from_type).elem_type.SizeOf;
+
+                    case ExprType.Kind.STRUCT_OR_UNION:
+                        return ((TStructOrUnion)from_type).Attribs[to_index].offset;
+
+                    default:
+                        throw new InvalidProgramException("Not an aggregate type.");
+                }
+            }
+
+            public static Int32 GetOffset(ExprType base_type, IReadOnlyList<Int32> indices)
+            {
+                Int32 offset = 0;
+                ExprType from_type = base_type;
+                foreach (Int32 to_index in indices)
+                {
+                    offset += GetOffset(from_type, to_index);
+                    from_type = GetType(from_type, to_index);
+                }
+                return offset;
             }
 
             public List<ExprType> GetTypes(ExprType base_type, IReadOnlyList<Int32> indices)
             {
                 List<ExprType> types = new List<ExprType> { base_type };
-                foreach (Int32 index in indices)
+                ExprType from_type = base_type;
+                foreach (Int32 to_index in indices)
                 {
-                    switch (base_type.kind)
-                    {
-                        case ExprType.Kind.ARRAY:
-                            base_type = ((TArray)base_type).elem_type;
-                            break;
-                        case ExprType.Kind.STRUCT_OR_UNION:
-                            base_type = ((TStructOrUnion)base_type).Attribs[index].type;
-                            break;
-                        default:
-                            throw new InvalidOperationException("Not an aggregate type.");
-                    }
-                    types.Add(base_type);
+                    from_type = GetType(from_type, to_index);
+                    types.Add(from_type);
                 }
                 return types;
             }
 
             public void Next()
             {
-                List<ExprType> types = GetTypes(base_type, indices);
+
+                // From base_type to CurType.
+                List<ExprType> types = GetTypes(this.base_type, this.indices);
+
+                // We try to jump as many levels out as we can.
                 do
                 {
-                    Int32 index = indices.Last();
-                    indices.RemoveAt(indices.Count - 1);
+                    Int32 index = this.indices.Last();
+                    this.indices.RemoveAt(this.indices.Count - 1);
 
                     types.RemoveAt(types.Count - 1);
                     ExprType type = types.Last();
@@ -241,81 +471,79 @@ namespace AST
                     switch (type.kind)
                     {
                         case ExprType.Kind.ARRAY:
-                            // TODO: what if incomplete?
                             if (index < ((TArray)type).num_elems - 1)
                             {
-                                indices.Add(index + 1);
+                                // There are more elements in the array.
+                                this.indices.Add(index + 1);
+                                return;
                             }
+                            break;
+
+                        case ExprType.Kind.INCOMPLETE_ARRAY:
+                            this.indices.Add(index + 1);
                             return;
+
                         case ExprType.Kind.STRUCT_OR_UNION:
                             if (((TStructOrUnion)type).IsStruct && index < ((TStructOrUnion)type).Attribs.Count - 1)
                             {
-                                indices.Add(index + 1);
+                                // There are more members in the struct.
+                                // (not union, since we can only initialize the first member of a union)
+                                this.indices.Add(index + 1);
+                                return;
                             }
-                            return;
+                            break;
+
                         default:
                             break;
                     }
-                } while (true);
+
+                } while (this.indices.Any());
             }
 
-            public void Read(ExprType type)
+            /// <summary>
+            /// Read an expression in the initializer list, locate the corresponding position.
+            /// </summary>
+            public void Locate(ExprType type)
             {
                 switch (type.kind)
                 {
                     case ExprType.Kind.STRUCT_OR_UNION:
-                        ReadStruct((TStructOrUnion)type);
+                        LocateStruct((TStructOrUnion)type);
                         return;
                     default:
-                        if (type.IsScalar())
-                        {
-                            ReadScalar((ScalarType)type);
-                            return;
-                        }
-                        throw new InvalidOperationException("Type not match.");
+                        // Even if the expression is of array type, treat it as a scalar (pointer).
+                        LocateScalar();
+                        return;
                 }
             }
 
-            public void ReadScalar(ScalarType type)
+            /// <summary>
+            /// Try to match a scalar.
+            /// This step doesn't check what scalar it is. Further steps would perform implicit conversions.
+            /// </summary>
+            private void LocateScalar()
             {
-                while (!CurType.IsScalar())
+                while (!this.CurType.IsScalar)
                 {
-                    switch (CurType.kind)
-                    {
-                        case ExprType.Kind.ARRAY:
-                            indices.Add(0);
-                            break;
-                        case ExprType.Kind.STRUCT_OR_UNION:
-                            indices.Add(0);
-                            break;
-                        default:
-                            throw new InvalidOperationException("Cannot find matching struct.");
-                    }
+                    this.indices.Add(0);
                 }
-                //if (!CurType.EqualType(type)) {
-                //    throw new InvalidOperationException("Type not match.");
-                //}
             }
 
-            public void ReadStruct(TStructOrUnion type)
+            /// <summary>
+            /// Try to match a given struct.
+            /// Go down to find the first element of the same struct type.
+            /// </summary>
+            private void LocateStruct(TStructOrUnion type)
             {
-                while (true)
+                while (!this.CurType.EqualType(type))
                 {
-                    switch (CurType.kind)
+                    if (this.CurType.IsScalar)
                     {
-                        case ExprType.Kind.ARRAY:
-                            indices.Add(0);
-                            break;
-                        case ExprType.Kind.STRUCT_OR_UNION:
-                            if (CurType.EqualType(type))
-                            {
-                                return;
-                            }
-                            indices.Add(0);
-                            break;
-                        default:
-                            throw new InvalidOperationException("Cannot find matching struct.");
+                        throw new InvalidOperationException("Trying to match a struct or union, but found a scalar.");
                     }
+
+                    // Go down one level.
+                    this.indices.Add(0);
                 }
             }
 
@@ -323,26 +551,29 @@ namespace AST
             public readonly List<Int32> indices;
         }
 
-        public ExprType CurType { get { return trace.Last().CurType; } }
-        public void Next() => trace.Last().Next();
-        public void Read(ExprType type) => trace.Last().Read(type);
+        public ExprType CurType => this.trace.Last().CurType;
+
+        public Int32 CurOffset => this.trace.Select(_ => _.CurOffset).Sum();
+
+        public void Next() => this.trace.Last().Next();
+
+        public void Locate(ExprType type) => this.trace.Last().Locate(type);
+
         public void InBrace()
         {
-            trace.Add(new Status(trace.Last().CurType));
-            switch (CurType.kind)
+
+            /// Push the current position into the stack, so that we can get back by <see cref="OutBrace"/>
+            this.trace.Add(new Status(this.trace.Last().CurType));
+
+            // For aggregate types, go inside and locate the first member.
+            if (!this.CurType.IsScalar)
             {
-                case ExprType.Kind.ARRAY:
-                    trace.Last().indices.Add(0);
-                    break;
-                case ExprType.Kind.STRUCT_OR_UNION:
-                    trace.Last().indices.Add(0);
-                    break;
-                default:
-                    break;
-                    // throw new InvalidOperationException("Invalid brace.");
+                this.trace.Last().indices.Add(0);
             }
+
         }
-        public void OutBrace() => trace.RemoveAt(trace.Count - 1);
+
+        public void OutBrace() => this.trace.RemoveAt(this.trace.Count - 1);
 
         public readonly List<Status> trace;
     }

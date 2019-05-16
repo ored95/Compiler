@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using CodeGeneration;
 
 namespace AST
 {
@@ -7,15 +8,15 @@ namespace AST
     {
         public TranslnUnit(List<Tuple<Env, ExternDecln>> _declns)
         {
-            declns = _declns;
+            this.declns = _declns;
         }
         public readonly List<Tuple<Env, ExternDecln>> declns;
 
         public void CodeGenerate(CGenState state)
         {
-            foreach (Tuple<Env, ExternDecln> decln in declns)
+            foreach (Tuple<Env, ExternDecln> decln in this.declns)
             {
-                decln.Item2.CGenExternDecln(decln.Item1, state);
+                decln.Item2.CGenDecln(decln.Item1, state);
             }
 
         }
@@ -23,25 +24,22 @@ namespace AST
 
     public interface ExternDecln
     {
-        void CGenExternDecln(Env env, CGenState state);
+        void CGenDecln(Env env, CGenState state);
     }
 
     public class FuncDef : ExternDecln
     {
-        public FuncDef(String _name, Decln.SCS _scs, TFunction _type, Stmt _stmt)
+        public FuncDef(String name, StorageClass scs, TFunction type, Stmt stmt)
         {
-            func_name = _name;
-            func_scs = _scs;
-            func_type = _type;
-            func_stmt = _stmt;
+            this.name = name;
+            this.scs = scs;
+            this.type = type;
+            this.stmt = stmt;
         }
 
-        public override String ToString()
-        {
-            return "fn " + func_name + " : " + func_type.ToString();
-        }
+        public override String ToString() => $"fn {this.name}: {this.type}";
 
-        public void CGenExternDecln(Env env, CGenState state)
+        public void CGenDecln(Env env, CGenState state)
         {
             //     .text
             //     [.globl <func>]
@@ -50,18 +48,18 @@ namespace AST
             //     movl %esp, %ebp
             // 
             state.TEXT();
-            Env.Entry entry = env.Find(func_name);
+            Env.Entry entry = env.Find(this.name).Value;
             state.COMMENT(ToString());
             switch (entry.kind)
             {
                 case Env.EntryKind.GLOBAL:
-                    switch (func_scs)
+                    switch (this.scs)
                     {
-                        case Decln.SCS.AUTO:
-                        case Decln.SCS.EXTERN:
-                            state.GLOBL(func_name);
+                        case StorageClass.AUTO:
+                        case StorageClass.EXTERN:
+                            state.GLOBL(this.name);
                             break;
-                        case Decln.SCS.STATIC:
+                        case StorageClass.STATIC:
                             // static definition
                             break;
                         default:
@@ -71,9 +69,14 @@ namespace AST
                 default:
                     throw new InvalidOperationException();
             }
-            state.CGenFuncStart(func_name);
+            state.CGenFuncStart(this.name);
 
-            func_stmt.CGenStmt(env, state);
+            state.InFunction(GotoLabelsGrabber.GrabLabels(this.stmt));
+
+            this.stmt.CGenStmt(env, state);
+
+            state.CGenLabel(state.ReturnLabel);
+            state.OutFunction();
 
             //     leave
             //     ret
@@ -82,9 +85,9 @@ namespace AST
             state.NEWLINE();
         }
 
-        public readonly String func_name;
-        public readonly Decln.SCS func_scs;
-        public readonly TFunction func_type;
-        public readonly Stmt func_stmt;
+        public readonly String name;
+        public readonly StorageClass scs;
+        public readonly TFunction type;
+        public readonly Stmt stmt;
     }
 }
